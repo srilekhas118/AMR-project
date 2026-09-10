@@ -1,0 +1,17 @@
+Antibiotic,Antibiotic_Key,Model,Accuracy,Precision,Recall,F1_Score,ROC_AUC,Test_Samples
+Ampicillin,ampicillin,Logistic Regression,0.7758,0.4089,0.7214,0.5219,0.8348,6178
+Ampicillin,ampicillin,Random Forest,0.8153,0.4688,0.666,0.5503,0.8493,6178
+Ampicillin,ampicillin,Gradient Boosting,0.7985,0.4429,0.729,0.551,0.8542,6178
+Ampicillin,ampicillin,Tabular Transformer,0.7977,0.4409,0.7195,0.5468,0.8542,6178
+Tetracycline,tetracycline,Logistic Regression,0.7136,0.4301,0.7684,0.5515,0.7984,7951
+Tetracycline,tetracycline,Random Forest,0.757,0.4802,0.7327,0.5802,0.8134,7951
+Tetracycline,tetracycline,Gradient Boosting,0.7446,0.4653,0.77,0.5801,0.8218,7951
+Tetracycline,tetracycline,Tabular Transformer,0.7293,0.4478,0.7772,0.5682,0.8154,7951
+Ciprofloxacin,ciprofloxacin,Logistic Regression,0.7952,0.2359,0.9449,0.3775,0.904,7731
+Ciprofloxacin,ciprofloxacin,Random Forest,0.8035,0.2425,0.937,0.3853,0.903,7731
+Ciprofloxacin,ciprofloxacin,Gradient Boosting,0.799,0.2395,0.9469,0.3824,0.9074,7731
+Ciprofloxacin,ciprofloxacin,Tabular Transformer,0.7883,0.2316,0.9587,0.373,0.9045,7731
+Streptomycin,streptomycin,Logistic Regression,0.7978,0.4865,0.7485,0.5897,0.8632,6188
+Streptomycin,streptomycin,Random Forest,0.8397,0.5722,0.6894,0.6254,0.8766,6188
+Streptomycin,streptomycin,Gradient Boosting,0.826,0.5376,0.7386,0.6222,0.8825,6188
+Streptomycin,streptomycin,Tabular Transformer,0.8056,0.4995,0.7694,0.6057,0.8778,6188

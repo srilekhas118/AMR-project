@@ -1,0 +1,366 @@
+{
+  "antibiotics": {
+    "ampicillin": {
+      "Logistic Regression": {
+        "accuracy": 0.7758,
+        "precision": 0.4089,
+        "recall": 0.7214,
+        "f1_score": 0.5219,
+        "roc_auc": 0.8348,
+        "confusion_matrix": [
+          [
+            4037,
+            1093
+          ],
+          [
+            292,
+            756
+          ]
+        ]
+      },
+      "Random Forest": {
+        "accuracy": 0.8153,
+        "precision": 0.4688,
+        "recall": 0.666,
+        "f1_score": 0.5503,
+        "roc_auc": 0.8493,
+        "confusion_matrix": [
+          [
+            4339,
+            791
+          ],
+          [
+            350,
+            698
+          ]
+        ]
+      },
+      "Gradient Boosting": {
+        "accuracy": 0.7985,
+        "precision": 0.4429,
+        "recall": 0.729,
+        "f1_score": 0.551,
+        "roc_auc": 0.8542,
+        "confusion_matrix": [
+          [
+            4169,
+            961
+          ],
+          [
+            284,
+            764
+          ]
+        ]
+      },
+      "Tabular Transformer": {
+        "accuracy": 0.7977,
+        "precision": 0.4409,
+        "recall": 0.7195,
+        "f1_score": 0.5468,
+        "roc_auc": 0.8542,
+        "confusion_matrix": [
+          [
+            4174,
+            956
+          ],
+          [
+            294,
+            754
+          ]
+        ]
+      }
+    },
+    "tetracycline": {
+      "Logistic Regression": {
+        "accuracy": 0.7136,
+        "precision": 0.4301,
+        "recall": 0.7684,
+        "f1_score": 0.5515,
+        "roc_auc": 0.7984,
+        "confusion_matrix": [
+          [
+            4274,
+            1855
+          ],
+          [
+            422,
+            1400
+          ]
+        ]
+      },
+      "Random Forest": {
+        "accuracy": 0.757,
+        "precision": 0.4802,
+        "recall": 0.7327,
+        "f1_score": 0.5802,
+        "roc_auc": 0.8134,
+        "confusion_matrix": [
+          [
+            4684,
+            1445
+          ],
+          [
+            487,
+            1335
+          ]
+        ]
+      },
+      "Gradient Boosting": {
+        "accuracy": 0.7446,
+        "precision": 0.4653,
+        "recall": 0.77,
+        "f1_score": 0.5801,
+        "roc_auc": 0.8218,
+        "confusion_matrix": [
+          [
+            4517,
+            1612
+          ],
+          [
+            419,
+            1403
+          ]
+        ]
+      },
+      "Tabular Transformer": {
+        "accuracy": 0.7293,
+        "precision": 0.4478,
+        "recall": 0.7772,
+        "f1_score": 0.5682,
+        "roc_auc": 0.8154,
+        "confusion_matrix": [
+          [
+            4383,
+            1746
+          ],
+          [
+            406,
+            1416
+          ]
+        ]
+      }
+    },
+    "ciprofloxacin": {
+      "Logistic Regression": {
+        "accuracy": 0.7952,
+        "precision": 0.2359,
+        "recall": 0.9449,
+        "f1_score": 0.3775,
+        "roc_auc": 0.904,
+        "confusion_matrix": [
+          [
+            5668,
+            1555
+          ],
+          [
+            28,
+            480
+          ]
+        ]
+      },
+      "Random Forest": {
+        "accuracy": 0.8035,
+        "precision": 0.2425,
+        "recall": 0.937,
+        "f1_score": 0.3853,
+        "roc_auc": 0.903,
+        "confusion_matrix": [
+          [
+            5736,
+            1487
+          ],
+          [
+            32,
+            476
+          ]
+        ]
+      },
+      "Gradient Boosting": {
+        "accuracy": 0.799,
+        "precision": 0.2395,
+        "recall": 0.9469,
+        "f1_score": 0.3824,
+        "roc_auc": 0.9074,
+        "confusion_matrix": [
+          [
+            5696,
+            1527
+          ],
+          [
+            27,
+            481
+          ]
+        ]
+      },
+      "Tabular Transformer": {
+        "accuracy": 0.7883,
+        "precision": 0.2316,
+        "recall": 0.9587,
+        "f1_score": 0.373,
+        "roc_auc": 0.9045,
+        "confusion_matrix": [
+          [
+            5607,
+            1616
+          ],
+          [
+            21,
+            487
+          ]
+        ]
+      }
+    },
+    "streptomycin": {
+      "Logistic Regression": {
+        "accuracy": 0.7978,
+        "precision": 0.4865,
+        "recall": 0.7485,
+        "f1_score": 0.5897,
+        "roc_auc": 0.8632,
+        "confusion_matrix": [
+          [
+            4038,
+            949
+          ],
+          [
+            302,
+            899
+          ]
+        ]
+      },
+      "Random Forest": {
+        "accuracy": 0.8397,
+        "precision": 0.5722,
+        "recall": 0.6894,
+        "f1_score": 0.6254,
+        "roc_auc": 0.8766,
+        "confusion_matrix": [
+          [
+            4368,
+            619
+          ],
+          [
+            373,
+            828
+          ]
+        ]
+      },
+      "Gradient Boosting": {
+        "accuracy": 0.826,
+        "precision": 0.5376,
+        "recall": 0.7386,
+        "f1_score": 0.6222,
+        "roc_auc": 0.8825,
+        "confusion_matrix": [
+          [
+            4224,
+            763
+          ],
+          [
+            314,
+            887
+          ]
+        ]
+      },
+      "Tabular Transformer": {
+        "accuracy": 0.8056,
+        "precision": 0.4995,
+        "recall": 0.7694,
+        "f1_score": 0.6057,
+        "roc_auc": 0.8778,
+        "confusion_matrix": [
+          [
+            4061,
+            926
+          ],
+          [
+            277,
+            924
+          ]
+        ]
+      }
+    }
+  },
+  "best_models": {
+    "ampicillin": {
+      "model_name": "Gradient Boosting",
+      "metrics": {
+        "accuracy": 0.7985,
+        "precision": 0.4429,
+        "recall": 0.729,
+        "f1_score": 0.551,
+        "roc_auc": 0.8542,
+        "confusion_matrix": [
+          [
+            4169,
+            961
+          ],
+          [
+            284,
+            764
+          ]
+        ]
+      }
+    },
+    "tetracycline": {
+      "model_name": "Random Forest",
+      "metrics": {
+        "accuracy": 0.757,
+        "precision": 0.4802,
+        "recall": 0.7327,
+        "f1_score": 0.5802,
+        "roc_auc": 0.8134,
+        "confusion_matrix": [
+          [
+            4684,
+            1445
+          ],
+          [
+            487,
+            1335
+          ]
+        ]
+      }
+    },
+    "ciprofloxacin": {
+      "model_name": "Random Forest",
+      "metrics": {
+        "accuracy": 0.8035,
+        "precision": 0.2425,
+        "recall": 0.937,
+        "f1_score": 0.3853,
+        "roc_auc": 0.903,
+        "confusion_matrix": [
+          [
+            5736,
+            1487
+          ],
+          [
+            32,
+            476
+          ]
+        ]
+      }
+    },
+    "streptomycin": {
+      "model_name": "Random Forest",
+      "metrics": {
+        "accuracy": 0.8397,
+        "precision": 0.5722,
+        "recall": 0.6894,
+        "f1_score": 0.6254,
+        "roc_auc": 0.8766,
+        "confusion_matrix": [
+          [
+            4368,
+            619
+          ],
+          [
+            373,
+            828
+          ]
+        ]
+      }
+    }
+  }
+}
