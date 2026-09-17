@@ -303,7 +303,7 @@ def main():
             specimen_source = st.selectbox("Specimen Source", schema["categorical_values"]["Specimen_Source"], index=0)
 
         with col3:
-            data_year = st.slider("Surveillance Year", min_value=1996, max_value=2015, value=2015)
+            data_year = 2015  # Fixed internally, UI removed
             abx_choices = {v["display_name"]: k for k, v in schema["selected_antibiotics"].items()}
             selected_abx_display = st.selectbox("Target Antibiotic", list(abx_choices.keys()))
             selected_abx_key = abx_choices[selected_abx_display]
@@ -572,7 +572,7 @@ def main():
 
                 with col_b:
                     st.caption(stab_res["disclaimer"])
-                    st.write(f"Tested `{stab_res['total_perturbations_tested']}` controlled perturbations across surveillance year, age bracket, and specimen source.")
+                    st.write(f"Tested `{stab_res['total_perturbations_tested']}` controlled perturbations across age bracket and specimen source.")
 
                 st.subheader("Perturbation Output Breakdown")
                 st.dataframe(pd.DataFrame(stab_res["perturbation_details"]), use_container_width=True)
