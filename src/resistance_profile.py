@@ -5,14 +5,18 @@ Generates comprehensive resistance prediction panels across all monitored antibi
 import pandas as pd
 from src.predict import predict_sample
 from src.preprocessing import load_schema
+from src.shap_explainer import explain_sample_top_reasons
+
+SAFETY_GUIDANCE_TEXT = "Potential option for clinical review — requires clinical confirmation."
 
 
-def generate_resistance_profile(sample_data, model_name=None):
+def generate_resistance_profile(sample_data, model_name=None, include_shap=True):
     """Generate multi-antibiotic resistance profile across all selected targets.
     
     Args:
         sample_data (dict or DataFrame): Input sample attributes.
         model_name (str, optional): Target model architecture.
+        include_shap (bool): Whether to calculate top SHAP driver features.
         
     Returns:
         dict: Complete multi-target profile with summary metrics.
@@ -31,7 +35,7 @@ def generate_resistance_profile(sample_data, model_name=None):
         if pred_res["is_resistant"]:
             resistant_count += 1
 
-        # Determine confidence label
+        # Determine confidence tier
         if prob_r >= 0.75:
             conf_tier = "High Probability Resistance"
         elif prob_r >= 0.50:
@@ -41,15 +45,25 @@ def generate_resistance_profile(sample_data, model_name=None):
         else:
             conf_tier = "High Probability Susceptibility"
 
+        # Calculate SHAP "Why?" feature summary
+        if include_shap:
+            shap_why = explain_sample_top_reasons(sample_data, antibiotic=abx_key, top_k=2, model_name=model_name)
+        else:
+            shap_why = "Baseline profile"
+
         profile_rows.append({
             "Antibiotic": pred_res["antibiotic"],
             "Drug Class": pred_res["drug_class"],
+            "Prediction (R/S)": "Resistant (R)" if pred_res["is_resistant"] else "Susceptible (S)",
             "Prediction": pred_res["prediction"],
             "Resistance Probability": f"{round(prob_r * 100, 1)}%",
             "Susceptibility Probability": f"{round((1 - prob_r) * 100, 1)}%",
             "Raw Probability": prob_r,
-            "Model Used": pred_res["model_used"],
-            "Confidence Assessment": conf_tier
+            "Confidence": conf_tier,
+            "Confidence Assessment": conf_tier,
+            "SHAP 'Why?'": shap_why,
+            "Clinical Safety Guidance": SAFETY_GUIDANCE_TEXT,
+            "Model Used": pred_res["model_used"]
         })
 
     profile_df = pd.DataFrame(profile_rows)
@@ -66,5 +80,7 @@ def generate_resistance_profile(sample_data, model_name=None):
         "susceptible_targets_count": total_targets - resistant_count,
         "mdr_status": mdr_status,
         "is_mdr": is_mdr,
+        "safety_guidance": SAFETY_GUIDANCE_TEXT,
         "disclaimer": "This panel represents AI model estimations based on historical epidemiological patterns, not laboratory in-vitro AST results."
     }
+

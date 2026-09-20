@@ -20,19 +20,19 @@ from src.anomaly_detection import fit_and_save_anomaly_detector
 MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "artifacts", "models")
 
 
-def train_classical_models():
+def train_classical_models(only_new=True):
     os.makedirs(MODELS_DIR, exist_ok=True)
     schema = load_schema()
     
-    train_df = pd.read_csv("data/processed/train.csv")
-    val_df = pd.read_csv("data/processed/val.csv")
     cleaned_path = os.path.join("data", "processed", "narms_cleaned.csv")
-    if os.path.exists(cleaned_path):
-        cleaned_df = pd.read_csv(cleaned_path, low_memory=False)
-        validation = validate_dataset(cleaned_df, schema=schema)
-        print(f"Dataset validation passed: {validation['n_records']} usable records.")
-    print(f"Loaded Train: {len(train_df)} rows, Val: {len(val_df)} rows")
+    if not os.path.exists(cleaned_path):
+        raise FileNotFoundError(f"Cleaned dataset not found at {cleaned_path}")
+    
+    cleaned_df = pd.read_csv(cleaned_path, low_memory=False)
+    validation = validate_dataset(cleaned_df, schema=schema)
+    print(f"Dataset validation passed: {validation['n_records']} usable records.")
 
+    train_df = pd.read_csv("data/processed/train.csv")
     # 1. Fit & save the unified preprocessing pipeline on training data
     print("Fitting unified feature preprocessor...")
     preprocessor = fit_and_save_preprocessor(train_df, schema=schema)
@@ -45,27 +45,42 @@ def train_classical_models():
     print("Fitting baseline Isolation Forest anomaly detector...")
     fit_and_save_anomaly_detector(X_train_full)
 
-    # 3. Train models for each selected antibiotic
+    # 3. Train models for selected antibiotics
     antibiotics = schema["selected_antibiotics"]
+    existing_keys = {"ampicillin", "tetracycline", "ciprofloxacin", "streptomycin"}
 
     for abx_key, abx_info in antibiotics.items():
+        save_path = os.path.join(MODELS_DIR, f"{abx_key}_models.joblib")
+        if only_new and abx_key in existing_keys and os.path.exists(save_path):
+            print(f"\nSkipping existing model for {abx_info['display_name']} ({abx_key}) as instructed.")
+            continue
+
         display_name = abx_info["display_name"]
         target_col = abx_info["target_column"]
         print(f"\n==========================================")
         print(f"Training models for {display_name} ({target_col})...")
         print(f"==========================================")
 
-        # Filter valid observations (0=S, 1=R)
-        train_mask = train_df[target_col].notnull()
-        X_train_subset = train_df[train_mask]
-        y_train = train_df.loc[train_mask, target_col].astype(int).values
+        # Filter valid records for this antibiotic
+        valid_subset = cleaned_df[cleaned_df[target_col].notnull()].copy()
+        n_valid = len(valid_subset)
+        print(f"Total valid observations for {display_name}: {n_valid}")
 
-        val_mask = val_df[target_col].notnull()
-        X_val_subset = val_df[val_mask]
-        y_val = val_df.loc[val_mask, target_col].astype(int).values
+        # Sample N=50,000 if valid records > 50,000 before splitting
+        if n_valid > 50000:
+            print(f"Sampling N=50,000 (random_state=42) from {n_valid} valid records...")
+            valid_subset = valid_subset.sample(n=50000, random_state=42)
 
-        X_train_feat = transform_data(X_train_subset, preprocessor)
-        X_val_feat = transform_data(X_val_subset, preprocessor)
+        # 70/15/15 train/val/test split with random_state=42
+        from sklearn.model_selection import train_test_split
+        train_sub, temp_sub = train_test_split(valid_subset, test_size=0.30, random_state=42, shuffle=True)
+        val_sub, test_sub = train_test_split(temp_sub, test_size=0.50, random_state=42, shuffle=True)
+
+        y_train = train_sub[target_col].astype(int).values
+        y_val = val_sub[target_col].astype(int).values
+
+        X_train_feat = transform_data(train_sub, preprocessor)
+        X_val_feat = transform_data(val_sub, preprocessor)
 
         pos_count = int(np.sum(y_train == 1))
         neg_count = int(np.sum(y_train == 0))
@@ -84,7 +99,6 @@ def train_classical_models():
             trained_abx_models[model_name] = model_obj
 
         # Save model bundle
-        save_path = os.path.join(MODELS_DIR, f"{abx_key}_models.joblib")
         joblib.dump(trained_abx_models, save_path)
         print(f"Saved {display_name} models to {save_path}")
 
@@ -92,4 +106,4 @@ def train_classical_models():
 
 
 if __name__ == "__main__":
-    train_classical_models()
+    train_classical_models(only_new=True)

@@ -3,14 +3,31 @@ Uses config/feature_schema.json as the Single Source of Truth.
 """
 
 import os
+import sys
+import types
 import json
 import joblib
 import pandas as pd
 import numpy as np
+import sklearn.compose._column_transformer
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+# Backward compatibility shims for unpickling artifacts across scikit-learn versions
+if not hasattr(sklearn.compose._column_transformer, "_RemainderColsList"):
+    sklearn.compose._column_transformer._RemainderColsList = list
+
+if "_loss" not in sys.modules:
+    try:
+        import sklearn._loss.loss as _sk_loss
+        loss_cls = getattr(_sk_loss, "HalfBinomialLoss", None)
+    except Exception:
+        loss_cls = None
+    _loss_mod = types.ModuleType("_loss")
+    _loss_mod.CyHalfBinomialLoss = loss_cls
+    sys.modules["_loss"] = _loss_mod
 
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "feature_schema.json")
 PREPROCESSOR_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "artifacts", "preprocessors")

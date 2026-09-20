@@ -42,6 +42,17 @@ st.markdown("""
         margin-bottom: 1.5rem;
         line-height: 1.5;
     }
+    .safety-box {
+        background-color: #EFF6FF;
+        border-left: 5px solid #3B82F6;
+        padding: 0.9rem 1.2rem;
+        border-radius: 4px;
+        color: #1E40AF;
+        font-size: 0.95rem;
+        margin-top: 1rem;
+        margin-bottom: 1.25rem;
+        font-weight: 500;
+    }
     .metric-card {
         background: #FFFFFF;
         border: 1px solid #E2E8F0;
@@ -85,7 +96,6 @@ from src.predict import predict_sample, load_model, get_best_model_name
 from src.shap_explainer import explain_sample, get_global_feature_importance
 from src.anomaly_detection import detect_anomaly, load_anomaly_detector
 from src.stability_analysis import analyze_stability
-from src.trend_analysis import compute_yearly_trends, compute_organism_trends, build_trend_plot
 from src.resistance_profile import generate_resistance_profile
 from src.what_if import run_what_if_analysis
 
@@ -149,15 +159,14 @@ def main():
         "5. Explainable AI (SHAP)",
         "6. Anomaly Detection",
         "7. Stability Analysis",
-        "8. Trend Analysis",
-        "9. What-If Analysis",
-        "10. Model Performance",
-        "11. About"
+        "8. What-If Analysis",
+        "9. Model Performance",
+        "10. About"
     ]
     
     selection = st.sidebar.radio("Navigation", pages)
     st.sidebar.markdown("---")
-    st.sidebar.info("**Target Antibiotics**:\n- Ampicillin (Beta-lactam)\n- Tetracycline (Tetracyclines)\n- Ciprofloxacin (Fluoroquinolones)\n- Streptomycin (Aminoglycosides)")
+    st.sidebar.info("**Target Antibiotics**:\n- Ampicillin (Beta-lactam)\n- Tetracycline (Tetracyclines)\n- Ciprofloxacin (Fluoroquinolones)\n- Streptomycin (Aminoglycosides)\n- Gentamicin (Aminoglycosides)\n- Nalidixic Acid (Quinolones)")
 
     # ==========================================
     # PAGE 1: HOME
@@ -172,7 +181,7 @@ def main():
         with col1:
             st.metric("Surveillance Records", f"{len(cleaned_df):,}" if not cleaned_df.empty else "54,351")
         with col2:
-            st.metric("Target Antibiotics", "4 Drug Classes")
+            st.metric("Target Antibiotics", "6 Monitored Drugs")
         with col3:
             st.metric("Surveillance Horizon", "1996 – 2015 (20 yrs)")
         with col4:
@@ -190,8 +199,8 @@ def main():
             #### 1. Input & Conditioning
             - **Microbiological Data**: Genus, Species, Serotype
             - **Epidemiological Context**: Age Group, HHS Region, Specimen Source
-            - **Temporal Baseline**: Surveillance Collection Year
-            - **Leakage Prevention**: Exclusion of post-outcome variables
+            - **Temporal Baseline**: Standardized surveillance baseline
+            - **Leakage Prevention**: Complete isolation of post-treatment variables
             """)
         with flow_col2:
             st.markdown("""
@@ -199,14 +208,14 @@ def main():
             - **Classical ML**: Logistic Regression, Random Forest, HistGradientBoosting
             - **Deep Learning**: Lightweight Tabular Transformer (PyTorch)
             - **Anomaly Filter**: Baseline Isolation Forest detector
-            - **Target Panel**: Ampicillin, Tetracycline, Ciprofloxacin, Streptomycin
+            - **Target Panel**: Ampicillin, Tetracycline, Ciprofloxacin, Streptomycin, Gentamicin, Nalidixic Acid
             """)
         with flow_col3:
             st.markdown("""
             #### 3. Analytical Intelligence
-            - **Local & Global SHAP**: Feature contribution breakdown
-            - **Stability Engine**: Mathematical perturbation testing
-            - **Historical Trends**: 20-year empirical trajectories
+            - **Local & Global SHAP**: Feature contribution breakdown & 'Why?' explanations
+            - **Stability Engine**: Controlled perturbation robustness testing
+            - **Resistance Profile**: Multi-target resistance grid with safety guidance
             - **What-If Sensitivity**: Dynamic counterfactual simulation
             """)
 
@@ -367,6 +376,9 @@ def main():
         st.markdown('<div class="sub-header">Comprehensive multi-drug resistance panel across all monitored antibiotic classes</div>', unsafe_allow_html=True)
         render_disclaimer()
 
+        # Clinical Safety Text Notice
+        st.markdown('<div class="safety-box"><strong>Clinical Safety Notice:</strong> Potential option for clinical review — requires clinical confirmation.</div>', unsafe_allow_html=True)
+
         # Sample input bar
         st.subheader("Isolate Parameters")
         c1, c2, c3, c4 = st.columns(4)
@@ -385,14 +397,21 @@ def main():
             "Data_Year": 2015
         }
 
-        profile = generate_resistance_profile(sample_input)
+        profile = generate_resistance_profile(sample_input, include_shap=True)
         
         st.markdown("---")
         st.subheader("Multi-Target Resistance Panel")
         
-        prof_col1, prof_col2 = st.columns([2, 1])
+        prof_col1, prof_col2 = st.columns([2.3, 1])
         with prof_col1:
-            st.dataframe(profile["profile_df"][["Antibiotic", "Drug Class", "Prediction", "Resistance Probability", "Confidence Assessment", "Model Used"]], use_container_width=True)
+            display_grid_df = profile["profile_df"][[
+                "Antibiotic",
+                "Prediction (R/S)",
+                "Resistance Probability",
+                "Confidence",
+                "SHAP 'Why?'"
+            ]]
+            st.dataframe(display_grid_df, use_container_width=True)
 
         with prof_col2:
             st.markdown('<div class="metric-card">', unsafe_allow_html=True)
@@ -402,6 +421,7 @@ def main():
                 st.markdown('<div class="status-badge-res">MDR Alert Detected</div>', unsafe_allow_html=True)
             else:
                 st.markdown('<div class="status-badge-susc">Standard Resistance Profile</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-size:0.85rem; color:#1E40AF; margin-top:0.75rem; font-weight:500;">{profile["safety_guidance"]}</div>', unsafe_allow_html=True)
             st.caption(profile["disclaimer"])
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -578,43 +598,9 @@ def main():
                 st.dataframe(pd.DataFrame(stab_res["perturbation_details"]), use_container_width=True)
 
     # ==========================================
-    # PAGE 8: TREND ANALYSIS
+    # PAGE 8: WHAT-IF ANALYSIS
     # ==========================================
-    elif selection == "8. Trend Analysis":
-        st.markdown('<div class="main-header">Historical Resistance Trend Analysis</div>', unsafe_allow_html=True)
-        st.markdown('<div class="sub-header">20-year empirical surveillance trajectories from the CDC & FDA NARMS database (1996–2015)</div>', unsafe_allow_html=True)
-        render_disclaimer()
-
-        trend_df = compute_yearly_trends(cleaned_df, schema)
-        if trend_df.empty:
-            st.warning("Trend analysis is unavailable because the selected dataset does not contain sufficient temporal information.")
-            return
-
-        fig_trends = build_trend_plot(trend_df)
-        st.plotly_chart(fig_trends, use_container_width=True)
-
-        st.subheader("Pathogen-Specific Trajectories")
-        org_trends = compute_organism_trends(cleaned_df, schema)
-        if not org_trends.empty:
-            sel_genus = st.selectbox("Select Genus to Filter", org_trends["Genus"].unique())
-            filtered_org = org_trends[org_trends["Genus"] == sel_genus]
-            
-            fig_org = px.line(
-                filtered_org,
-                x="Data_Year",
-                y="resistance_rate_pct",
-                color="antibiotic",
-                markers=True,
-                title=f"Resistance Trends for {sel_genus} (1996–2015)",
-                labels={"Data_Year": "Year", "resistance_rate_pct": "Resistance Rate (%)"},
-                template="plotly_white"
-            )
-            st.plotly_chart(fig_org, use_container_width=True)
-
-    # ==========================================
-    # PAGE 9: WHAT-IF ANALYSIS
-    # ==========================================
-    elif selection == "9. What-If Analysis":
+    elif selection == "8. What-If Analysis":
         st.markdown('<div class="main-header">What-If Scenario & Counterfactual Analysis</div>', unsafe_allow_html=True)
         st.markdown('<div class="sub-header">Interactively test how changing specific features affects resistance probability</div>', unsafe_allow_html=True)
         render_disclaimer()
@@ -629,30 +615,31 @@ def main():
             b_gen = st.selectbox("Base Genus", schema["categorical_values"]["Genus"], index=2 if "Salmonella" in schema["categorical_values"]["Genus"] else 0)
             b_spec = st.selectbox("Base Species", schema["categorical_values"]["Species"], index=4 if "enterica" in schema["categorical_values"]["Species"] else 0)
             b_src = st.selectbox("Base Specimen Source", schema["categorical_values"]["Specimen_Source"], index=0)
-            b_yr = st.slider("Base Year", 1996, 2015, 2015, key="wi_byr")
+            b_ag = st.selectbox("Base Age Bracket", schema["categorical_values"]["Age_Group"], index=2 if "20-29" in schema["categorical_values"]["Age_Group"] else 0, key="wi_bag")
 
         with col2:
             st.subheader("2. Counterfactual Modifications")
             m_gen = st.selectbox("Modified Genus", schema["categorical_values"]["Genus"], index=0)
             m_spec = st.selectbox("Modified Species", schema["categorical_values"]["Species"], index=6 if "jejuni" in schema["categorical_values"]["Species"] else 0)
             m_src = st.selectbox("Modified Specimen Source", schema["categorical_values"]["Specimen_Source"], index=1)
-            m_yr = st.slider("Modified Year", 1996, 2015, 2000, key="wi_myr")
+            m_ag = st.selectbox("Modified Age Bracket", schema["categorical_values"]["Age_Group"], index=8 if len(schema["categorical_values"]["Age_Group"]) > 8 else 0, key="wi_mag")
 
         base_s = {
             "Genus": b_gen,
             "Species": b_spec,
             "Serotype_Grouped": "Other",
             "Region_Name": "Region 1",
-            "Age_Group": "20-29",
+            "Age_Group": b_ag,
             "Specimen_Source": b_src,
-            "Data_Year": b_yr
+            "Data_Year": 2015
         }
 
         modifications = {
             "Genus": m_gen,
             "Species": m_spec,
+            "Age_Group": m_ag,
             "Specimen_Source": m_src,
-            "Data_Year": m_yr
+            "Data_Year": 2015
         }
 
         if st.button("Simulate Counterfactual Shift", type="primary"):
@@ -686,11 +673,11 @@ def main():
             st.caption(whatif_res["disclaimer"])
 
     # ==========================================
-    # PAGE 10: MODEL PERFORMANCE
+    # PAGE 9: MODEL PERFORMANCE
     # ==========================================
-    elif selection == "10. Model Performance":
+    elif selection == "9. Model Performance":
         st.markdown('<div class="main-header">Model Performance & Empirical Evaluation</div>', unsafe_allow_html=True)
-        st.markdown('<div class="sub-header">Empirical test partition results across all 4 machine learning and deep learning architectures</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sub-header">Empirical test partition results across all machine learning and deep learning architectures</div>', unsafe_allow_html=True)
         render_disclaimer()
 
         if comp_df.empty:
@@ -703,9 +690,9 @@ def main():
         st.markdown("---")
         st.subheader("Empirical Best Models Selected (by F1-Score)")
         if "best_models" in metrics:
-            b_cols = st.columns(len(metrics["best_models"]))
+            b_cols = st.columns(min(6, len(metrics["best_models"])))
             for idx, (abx_k, b_info) in enumerate(metrics["best_models"].items()):
-                with b_cols[idx]:
+                with b_cols[idx % len(b_cols)]:
                     abx_disp = schema["selected_antibiotics"][abx_k]["display_name"]
                     st.markdown('<div class="metric-card">', unsafe_allow_html=True)
                     st.write(f"**{abx_disp}**")
@@ -734,9 +721,9 @@ def main():
                 st.image(roc_p, caption=f"ROC Curves - {sel_plot_abx.capitalize()}", use_container_width=True)
 
     # ==========================================
-    # PAGE 11: ABOUT
+    # PAGE 10: ABOUT
     # ==========================================
-    elif selection == "11. About":
+    elif selection == "10. About":
         st.markdown('<div class="main-header">About the Project</div>', unsafe_allow_html=True)
         st.markdown('<div class="sub-header">AI-Based Antibiotic Resistance Intelligence System (AMR-IS)</div>', unsafe_allow_html=True)
         render_disclaimer()
@@ -758,7 +745,7 @@ def main():
         ### 3. Methodology & Governance
         - **Dataset**: Real CDC & FDA NARMS Now surveillance records (54,351 isolates, 1996–2015).
         - **Strict Leakage Prevention**: Features restricted to microbiological, temporal, and patient context variables. Post-outcome test results and resistance genes are isolated.
-        - **Multi-Model Evaluation**: Empirical benchmarking across 4 architectures per antibiotic.
+        - **Multi-Model Evaluation**: Empirical benchmarking across architectures per antibiotic.
         - **No Retraining on Refresh**: Pre-fitted pipelines and saved checkpoints under `artifacts/` ensure instant response.
 
         ### 4. Ethical & Clinical Safety Boundaries

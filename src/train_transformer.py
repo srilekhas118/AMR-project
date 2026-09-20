@@ -79,36 +79,51 @@ def train_single_transformer(abx_key, X_train, y_train, X_val, y_val, epochs=10,
     return model
 
 
-def train_all_transformers():
+def train_all_transformers(only_new=True):
     set_seed(42)
     os.makedirs(TRANSFORMER_DIR, exist_ok=True)
     schema = load_schema()
-    preprocessor = load_preprocessor()
 
-    train_df = pd.read_csv("data/processed/train.csv")
-    val_df = pd.read_csv("data/processed/val.csv")
-    
+    cleaned_path = os.path.join("data", "processed", "narms_cleaned.csv")
+    if not os.path.exists(cleaned_path):
+        raise FileNotFoundError(f"Cleaned dataset not found at {cleaned_path}")
+    cleaned_df = pd.read_csv(cleaned_path, low_memory=False)
+
     antibiotics = schema["selected_antibiotics"]
+    existing_keys = {"ampicillin", "tetracycline", "ciprofloxacin", "streptomycin"}
 
     for abx_key, abx_info in antibiotics.items():
+        checkpoint_path = os.path.join(TRANSFORMER_DIR, f"{abx_key}_transformer.pt")
+        if only_new and abx_key in existing_keys and os.path.exists(checkpoint_path):
+            print(f"\nSkipping existing transformer checkpoint for {abx_info['display_name']} ({abx_key}) as instructed.")
+            continue
+
         display_name = abx_info["display_name"]
         target_col = abx_info["target_column"]
         print(f"\n==========================================", flush=True)
         print(f"Training Tabular Transformer for {display_name}...", flush=True)
         print(f"==========================================", flush=True)
 
-        train_mask = train_df[target_col].notnull()
-        val_mask = val_df[target_col].notnull()
+        valid_subset = cleaned_df[cleaned_df[target_col].notnull()].copy()
+        n_valid = len(valid_subset)
+        if n_valid > 50000:
+            print(f"Sampling N=50,000 (random_state=42) from {n_valid} valid records...", flush=True)
+            valid_subset = valid_subset.sample(n=50000, random_state=42)
 
-        X_train = transform_data(train_df[train_mask], preprocessor)
-        y_train = train_df.loc[train_mask, target_col].astype(int).values
+        from sklearn.model_selection import train_test_split
+        train_sub, temp_sub = train_test_split(valid_subset, test_size=0.30, random_state=42, shuffle=True)
+        val_sub, test_sub = train_test_split(temp_sub, test_size=0.50, random_state=42, shuffle=True)
 
-        X_val = transform_data(val_df[val_mask], preprocessor)
-        y_val = val_df.loc[val_mask, target_col].astype(int).values
+        preprocessor = load_preprocessor()
+
+        X_train = transform_data(train_sub, preprocessor)
+        y_train = train_sub[target_col].astype(int).values
+
+        X_val = transform_data(val_sub, preprocessor)
+        y_val = val_sub[target_col].astype(int).values
 
         model = train_single_transformer(abx_key, X_train, y_train, X_val, y_val, epochs=10, batch_size=512, lr=0.002)
 
-        checkpoint_path = os.path.join(TRANSFORMER_DIR, f"{abx_key}_transformer.pt")
         torch.save({
             "model_state_dict": model.state_dict(),
             "input_dim": X_train.shape[1],
@@ -124,4 +139,4 @@ def train_all_transformers():
 
 
 if __name__ == "__main__":
-    train_all_transformers()
+    train_all_transformers(only_new=True)

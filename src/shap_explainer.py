@@ -146,3 +146,20 @@ def get_global_feature_importance(antibiotic="ampicillin", model_name="Random Fo
         reverse=True
     )
     return ranked[:n_top]
+
+
+def explain_sample_top_reasons(sample_data, antibiotic="ampicillin", top_k=2, model_name=None):
+    """Compute a concise text summary of top SHAP feature drivers for inline grid display."""
+    try:
+        explanation = explain_sample(sample_data, antibiotic=antibiotic, model_name=model_name)
+        top_feats = explanation.get("top_features", [])[:top_k]
+        if not top_feats:
+            return "Standard baseline distribution"
+        reasons = []
+        for tf in top_feats:
+            sign = "+" if tf["shap_value"] >= 0 else ""
+            reasons.append(f"{tf['feature']} ({sign}{tf['shap_value']:.2f})")
+        return ", ".join(reasons)
+    except Exception:
+        return "Epidemiological feature baseline"
+

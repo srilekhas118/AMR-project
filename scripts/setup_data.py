@@ -84,7 +84,9 @@ def process_data():
         'ampicillin': 'AMP Concl',
         'tetracycline': 'TET Concl',
         'ciprofloxacin': 'CIP Concl',
-        'streptomycin': 'STR Concl'
+        'streptomycin': 'STR Concl',
+        'gentamicin': 'GEN Concl',
+        'nalidixic_acid': 'NAL Concl'
     }
 
     target_cols = {}
@@ -163,6 +165,22 @@ def process_data():
                 "code": "STR",
                 "drug_class": "Aminoglycosides",
                 "target_column": "target_streptomycin",
+                "positive_class": "Resistant",
+                "negative_class": "Susceptible"
+            },
+            "gentamicin": {
+                "display_name": "Gentamicin",
+                "code": "GEN",
+                "drug_class": "Aminoglycosides",
+                "target_column": "target_gentamicin",
+                "positive_class": "Resistant",
+                "negative_class": "Susceptible"
+            },
+            "nalidixic_acid": {
+                "display_name": "Nalidixic Acid",
+                "code": "NAL",
+                "drug_class": "Quinolones",
+                "target_column": "target_nalidixic_acid",
                 "positive_class": "Resistant",
                 "negative_class": "Susceptible"
             }

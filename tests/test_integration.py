@@ -29,7 +29,7 @@ def test_end_to_end_pipeline():
 
     # 2. Multi-Antibiotic Resistance Profile
     profile = generate_resistance_profile(sample)
-    assert len(profile["profile_list"]) == 4
+    assert len(profile["profile_list"]) == 6
     assert isinstance(profile["profile_df"], pd.DataFrame)
     assert "mdr_status" in profile
 

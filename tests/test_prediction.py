@@ -26,7 +26,7 @@ def test_validate_and_format_input(sample_input):
 
 
 def test_predict_sample_all_antibiotics(sample_input):
-    for abx in ["ampicillin", "tetracycline", "ciprofloxacin", "streptomycin"]:
+    for abx in ["ampicillin", "tetracycline", "ciprofloxacin", "streptomycin", "gentamicin", "nalidixic_acid"]:
         res = predict_sample(sample_input, antibiotic=abx)
         assert "prediction" in res
         assert res["prediction"] in ["Resistant", "Susceptible"]

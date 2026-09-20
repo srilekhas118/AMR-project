@@ -32,7 +32,7 @@ def test_transformer_forward_pass():
 
 
 def test_load_classical_model_bundle():
-    for abx in ["ampicillin", "tetracycline", "ciprofloxacin", "streptomycin"]:
+    for abx in ["ampicillin", "tetracycline", "ciprofloxacin", "streptomycin", "gentamicin", "nalidixic_acid"]:
         model_obj, resolved_name = load_model(abx, "Random Forest")
         assert model_obj is not None
         assert hasattr(model_obj, "predict_proba")
@@ -40,7 +40,7 @@ def test_load_classical_model_bundle():
 
 def test_load_transformer_checkpoints():
     from src.evaluate import load_transformer_model
-    for abx in ["ampicillin", "tetracycline", "ciprofloxacin", "streptomycin"]:
+    for abx in ["ampicillin", "tetracycline", "ciprofloxacin", "streptomycin", "gentamicin", "nalidixic_acid"]:
         model_obj = load_transformer_model(abx)
         assert model_obj is not None
         dummy = np.random.randn(2, model_obj.input_dim).astype(np.float32)

@@ -19,14 +19,14 @@ def test_dataset_validation_minimum_records():
     from src.preprocessing import validate_dataset
     result = validate_dataset(df, schema=schema)
     assert result["n_records"] >= 10000
-    assert len(result["antibiotics"]) == 4
+    assert len(result["antibiotics"]) == 6
 
 
 def test_schema_loading():
     schema = load_schema()
     assert "dataset_metadata" in schema
     assert "selected_antibiotics" in schema
-    assert len(schema["selected_antibiotics"]) == 4
+    assert len(schema["selected_antibiotics"]) == 6
     assert "features" in schema
     assert "categorical" in schema["features"]
     assert "numerical" in schema["features"]
