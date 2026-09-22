@@ -3,94 +3,153 @@
 [![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/)
 [![Framework](https://img.shields.io/badge/Framework-PyTorch%20%7C%20Scikit--Learn%20%7C%20Streamlit-orange.svg)](https://streamlit.io)
 [![Tests](https://img.shields.io/badge/tests-pytest-green.svg)](https://docs.pytest.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A research-oriented, computational decision-support and surveillance intelligence system for predicting antimicrobial resistance (AMR) across multiple clinical antibiotic classes using real-world CDC & FDA surveillance records.
+Research-oriented decision-support prototype for predicting antimicrobial resistance (AMR) from real CDC & FDA NARMS isolate surveillance records. The system combines classical machine learning, a lightweight tabular transformer, explainability, and a Streamlit dashboard.
 
----
-
-## 📌 Problem & Motivation
-Antimicrobial Resistance (AMR) is a critical global public health crisis. Developing transparent, explainable, and multi-paradigm machine learning models to analyze surveillance trends and predict isolate resistance patterns provides vital decision support for epidemiologists and researchers.
+This is **not** a clinical diagnostic tool and does not prescribe antibiotics.
 
 ---
 
-## 📊 Dataset Provenance
-- **Dataset**: National Antimicrobial Resistance Monitoring System (NARMS Now Isolate Surveillance)
-- **Source**: U.S. Centers for Disease Control and Prevention (CDC) & Food and Drug Administration (FDA)
-- **Official Link**: [https://wwwn.cdc.gov/narmsnow/](https://wwwn.cdc.gov/narmsnow/)
-- **Total Records**: 54,351 real surveillance isolates (1996–2015)
-- **Cleaned & Usable Records**: 54,351 observations partitioned into:
-  - **Training Set (70%)**: 38,045 records
-  - **Validation Set (15%)**: 8,153 records
-  - **Test Set (15%)**: 8,153 records
-- **Pathogens**: *Salmonella enterica*, *Campylobacter jejuni*, *Campylobacter coli*, *Shigella sonnei*, *Shigella flexneri*, *Escherichia coli*.
-- **Monitored Antibiotic Targets**:
-  1. **Ampicillin (`AMP`)** — Beta-lactam (Aminopenicillin)
-  2. **Tetracycline (`TET`)** — Tetracyclines
-  3. **Ciprofloxacin (`CIP`)** — Fluoroquinolones
-  4. **Streptomycin (`STR`)** — Aminoglycosides
+## Problem
+
+Antimicrobial resistance threatens routine infection treatment. This project estimates isolate-level resistance across six monitored drugs, explains model outputs with SHAP, flags unusual samples against the surveillance baseline, and tests prediction stability under input perturbations.
 
 ---
 
-## 🔬 Core System Modules
-1. **Single Source of Truth (`config/feature_schema.json`)**: Unifies categorical and numerical feature definitions across all components.
-2. **Standardized Preprocessing (`src/preprocessing.py`)**: Leakage-free Scikit-learn pipeline with imputers, one-hot encoders, and standard scalers.
-3. **Classical Machine Learning (`src/models.py`, `src/train.py`)**: Logistic Regression, Random Forest, and HistGradientBoosting classifiers.
-4. **Lightweight Tabular Transformer (`src/transformer_model.py`, `src/train_transformer.py`)**: CPU-friendly PyTorch self-attention architecture with token embeddings and CLS representations.
-5. **Explainable AI (`src/shap_explainer.py`)**: Local sample contributions and global feature importances via SHAP.
-6. **Anomaly Detection (`src/anomaly_detection.py`)**: Isolation Forest evaluating isolate normality against CDC surveillance baseline.
-7. **Model Output Stability (`src/stability_analysis.py`)**: Systematic feature perturbation engine testing prediction invariance.
-8. **Historical Trend Analysis (`src/trend_analysis.py`)**: 20-year empirical resistance trajectories with interactive Plotly visualizers.
-9. **Resistance Profile & What-If Analysis (`src/resistance_profile.py`, `src/what_if.py`)**: Multi-target resistance panels and counterfactual sensitivity testing.
-10. **Streamlit Research Dashboard (`app.py`)**: 11 dedicated healthcare-styled pages for interactive analysis and demonstration.
+## Dataset
+
+| Item | Value |
+|------|--------|
+| Source | [CDC / FDA NARMS Now](https://wwwn.cdc.gov/narmsnow/) isolate surveillance |
+| Usable records | 54,351 |
+| Data coverage | **20 years** (inclusive span from dataset metadata; calendar years are not shown in the UI) |
+| Train / validation / test | 38,045 (70%) / 8,153 (15%) / 8,153 (15%) |
+| Pathogen genera | *Salmonella*, *Campylobacter*, *Shigella*, *Escherichia* |
+
+**Model inputs (pre-treatment context only):** genus, species, grouped serotype, HHS region, age group, and specimen source. Collection year is used internally by the fitted pipeline and is not exposed as a dashboard filter.
+
+**Monitored targets** (binary: 0 = susceptible, 1 = resistant; intermediate / indeterminate labels excluded):
+
+1. Ampicillin (`AMP`) — beta-lactam  
+2. Tetracycline (`TET`) — tetracyclines  
+3. Ciprofloxacin (`CIP`) — fluoroquinolones  
+4. Streptomycin (`STR`) — aminoglycosides  
+5. Gentamicin (`GEN`) — aminoglycosides  
+6. Nalidixic acid (`NAL`) — quinolones  
 
 ---
 
-## 🛠 Installation & Quickstart
+## Dashboard (`app.py`)
 
-### 1. Clone & Setup Environment
+Ten-page, research-grade Streamlit UI (`http://localhost:8501`):
+
+1. Home  
+2. Dataset Overview  
+3. Resistance Prediction  
+4. Resistance Profile (six-drug panel)  
+5. Explainable AI (SHAP)  
+6. Anomaly Detection  
+7. Stability Analysis  
+8. What-If Analysis  
+9. Model Performance  
+10. About  
+
+### UI Design Principles
+
+The dashboard follows a **restrained, clinical/research aesthetic** — consistent with professional epidemiological and medical informatics software:
+
+- **Palette**: Slate/neutral scale (`#0F172A` → `#64748B`) with a single blue accent (`#2563EB`). No multi-color grids, gradients, or glows.
+- **Typography**: Strict hierarchy — `1.85rem` page headers, `0.95rem` sub-headers, `0.875rem` body text. Letter-spacing and line-height are explicitly set.
+- **Status labels**: Flat rectangular badges (3 px border-radius) with a 1 px solid border. No pill shapes (`border-radius: 9999px` is banned).
+- **Alert blocks**: Left-border-only accent lines (3 px) on plain backgrounds — no heavy box shadows or gradients.
+- **Charts**: `plotly_white` template throughout. Bar charts for all categorical distributions (pie/donut charts removed). SHAP contributions use deep red/green (`#B91C1C` / `#166534`), not neon variants.
+- **Sidebar**: 1 px right border separates navigation from the content area.
+
+---
+
+## System modules
+
+| Area | Location |
+|------|----------|
+| Feature schema (single source of truth) | `config/feature_schema.json` |
+| Preprocessing | `src/preprocessing.py` |
+| Prediction | `src/predict.py` |
+| Classical ML (logistic regression, random forest, hist gradient boosting) | `src/models.py`, `src/train.py` |
+| Tabular transformer (PyTorch) | `src/transformer_model.py`, `src/train_transformer.py` |
+| SHAP explanations | `src/shap_explainer.py` |
+| Isolation Forest anomaly scoring | `src/anomaly_detection.py` |
+| Perturbation stability | `src/stability_analysis.py` |
+| Multi-drug profile | `src/resistance_profile.py` |
+| Counterfactual what-if | `src/what_if.py` |
+| Evaluation metrics | `src/evaluate.py`, `results/` |
+| Optional yearly trend helpers (not a dashboard page) | `src/trend_analysis.py` |
+
+---
+
+## Quickstart
+
+Requires **Python 3.10+** (developed with 3.14).
+
 ```bash
 git clone <repository-url>
-cd AI_Antibiotic_Resistance
-python -m pip install -r requirements.txt
+cd AMR-project
+python setup.py
+python start.py
 ```
 
-### 2. Prepare Data & Train Models (If not already prepared)
+On Windows you can double-click `setup.bat`, then `start.bat`.
+
+`setup.py` creates `.venv`, installs `requirements.txt`, and runs `scripts/setup_data.py` only if processed data is missing. `start.py` launches Streamlit from that virtual environment.
+
+**Optional retraining** (not required if `artifacts/` and `results/` are already present):
+
 ```bash
-# Download, sanitize and split 54,351 NARMS records
 python scripts/setup_data.py
-
-# Train Classical ML models
 python -m src.train
-
-# Train Tabular Transformer models
 python -m src.train_transformer
-
-# Evaluate on test set and generate metrics
 python -m src.evaluate
 ```
 
-### 3. Run Automated Tests
-```bash
-python -m pytest -v
-```
+**Tests:**
 
-### 4. Launch Streamlit Web Application
 ```bash
-streamlit run app.py
+python -m pytest -q
 ```
 
 ---
 
-## 🧪 Test Suite
-The project includes comprehensive test suites under `tests/`:
-- `test_preprocessing.py`: Imputation, encoding, schema consistency, unseen categories.
-- `test_models.py`: Classical model factories, transformer forward pass, bundle persistence.
-- `test_prediction.py`: End-to-end prediction engine, confidence calculations, antibiotic dispatch.
-- `test_intelligence.py`: SHAP attributions, Isolation Forest anomaly scoring, perturbation stability, trend calculations.
-- `test_integration.py`: End-to-end pipeline execution from raw inputs to profile outputs.
+## Project layout
+
+```
+AMR-project/
+├── app.py                 # Streamlit dashboard (10-page clinical UI)
+├── setup.py / start.py    # Cross-platform setup and launch
+├── setup.bat / start.bat  # Windows wrappers
+├── requirements.txt
+├── config/feature_schema.json
+├── data/processed/        # Cleaned cohort and train/val/test splits
+├── src/                   # Models, prediction, intelligence modules
+├── scripts/setup_data.py
+├── tests/
+├── notebooks/
+└── results/               # Metrics and comparison tables
+```
 
 ---
 
-## ⚠️ Medical Safety & Research Disclaimer
-> **Research / Educational Prototype — Not for Clinical Diagnosis or Treatment**:
-> Predictions are estimates generated from historical epidemiological data and should not replace laboratory antimicrobial susceptibility testing (AST) or qualified medical judgment. This system does not prescribe or recommend antibiotics.
+## Tests
+
+| File | Covers |
+|------|--------|
+| `tests/test_preprocessing.py` | Imputation, encoding, schema, unseen categories |
+| `tests/test_models.py` | Classical factories, transformer forward pass, persistence |
+| `tests/test_prediction.py` | Isolate prediction and antibiotic dispatch |
+| `tests/test_intelligence.py` | SHAP, anomaly scores, stability, trend helpers |
+| `tests/test_integration.py` | End-to-end sample → profile |
+
+---
+
+## Disclaimer
+
+**Research / educational prototype — not for clinical diagnosis or treatment.** Predictions are statistical estimates from historical epidemiological surveillance data (CDC & FDA NARMS). They must not replace laboratory antimicrobial susceptibility testing (AST) or qualified medical judgment. The system does not recommend or select therapy for patients.

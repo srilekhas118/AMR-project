@@ -1,5 +1,5 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
 
 echo =======================================================
 echo   AMR Intelligence System - Launching Dashboard
@@ -7,26 +7,17 @@ echo =======================================================
 
 cd /d "%~dp0"
 
-:: Check if virtual environment exists
-if not exist ".venv\Scripts\activate.bat" (
-    echo [ERROR] Virtual environment (.venv) not found.
-    echo Please run setup.bat first to initialize the environment and install dependencies.
-    echo.
+where python >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] Python was not found in PATH.
+    echo Please install Python 3.10+ and ensure "Add Python to PATH" is checked.
     pause
     exit /b 1
 )
 
-:: Activate virtual environment
-call .venv\Scripts\activate.bat
-
-echo Starting Streamlit application on http://localhost:8501 ...
-echo (Press Ctrl+C in this terminal to stop the server)
-echo.
-
-python -m streamlit run app.py
-
+python start.py
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo [ERROR] Application exited with an error code: %ERRORLEVEL%
+    echo [ERROR] Application exited with an error.
     pause
 )

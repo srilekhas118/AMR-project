@@ -18,77 +18,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Healthcare / Research UI Styling
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 2.1rem;
-        font-weight: 700;
-        color: #1E293B;
-        margin-bottom: 0.2rem;
-    }
-    .sub-header {
-        font-size: 1.05rem;
-        color: #64748B;
-        margin-bottom: 1.5rem;
-    }
-    .disclaimer-box {
-        background-color: #FEF2F2;
-        border-left: 5px solid #EF4444;
-        padding: 1rem 1.25rem;
-        border-radius: 4px;
-        color: #991B1B;
-        font-size: 0.9rem;
-        margin-bottom: 1.5rem;
-        line-height: 1.5;
-    }
-    .safety-box {
-        background-color: #EFF6FF;
-        border-left: 5px solid #3B82F6;
-        padding: 0.9rem 1.2rem;
-        border-radius: 4px;
-        color: #1E40AF;
-        font-size: 0.95rem;
-        margin-top: 1rem;
-        margin-bottom: 1.25rem;
-        font-weight: 500;
-    }
-    .metric-card {
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 8px;
-        padding: 1.25rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .status-badge-res {
-        background-color: #FEE2E2;
-        color: #B91C1C;
-        padding: 0.35rem 0.75rem;
-        border-radius: 9999px;
-        font-weight: 600;
-        font-size: 0.85rem;
-        display: inline-block;
-    }
-    .status-badge-susc {
-        background-color: #DCFCE7;
-        color: #15803D;
-        padding: 0.35rem 0.75rem;
-        border-radius: 9999px;
-        font-weight: 600;
-        font-size: 0.85rem;
-        display: inline-block;
-    }
-    .status-badge-neutral {
-        background-color: #F1F5F9;
-        color: #334155;
-        padding: 0.35rem 0.75rem;
-        border-radius: 9999px;
-        font-weight: 600;
-        font-size: 0.85rem;
-        display: inline-block;
-    }
-</style>
-""", unsafe_allow_html=True)
+
 
 # Imports from src modules
 from src.preprocessing import load_schema, load_preprocessor, transform_data
@@ -130,15 +60,70 @@ def get_cached_comparison_df():
     return pd.DataFrame()
 
 
+def data_coverage_years(cleaned_df, schema):
+    """Inclusive year-span count from dataset/schema metadata. Never displays calendar years."""
+    if cleaned_df is not None and not cleaned_df.empty and "Data_Year" in cleaned_df.columns:
+        series = pd.to_numeric(cleaned_df["Data_Year"], errors="coerce").dropna()
+        if not series.empty:
+            return int(series.max()) - int(series.min()) + 1
+    time_range = schema.get("dataset_metadata", {}).get("time_range")
+    if isinstance(time_range, (list, tuple)) and len(time_range) >= 2:
+        return int(time_range[1]) - int(time_range[0]) + 1
+    year_range = schema.get("numerical_ranges", {}).get("Data_Year", {})
+    if "min" in year_range and "max" in year_range:
+        return int(year_range["max"]) - int(year_range["min"]) + 1
+    return None
+
+
+def coverage_display(years):
+    if years is None:
+        return "Unavailable"
+    unit = "Year" if years == 1 else "Years"
+    return f"{years} {unit}"
+
+
+def internal_data_year(schema, cleaned_df=None):
+    """Keep Data_Year for model inputs only; value comes from existing metadata."""
+    year_range = schema.get("numerical_ranges", {}).get("Data_Year", {})
+    if "default" in year_range:
+        return int(year_range["default"])
+    if cleaned_df is not None and not cleaned_df.empty and "Data_Year" in cleaned_df.columns:
+        series = pd.to_numeric(cleaned_df["Data_Year"], errors="coerce").dropna()
+        if not series.empty:
+            return int(series.max())
+    time_range = schema.get("dataset_metadata", {}).get("time_range")
+    if isinstance(time_range, (list, tuple)) and len(time_range) >= 2:
+        return int(time_range[1])
+    return None
+
+
+def hide_year_columns(df):
+    if df is None or df.empty:
+        return df
+    drop_cols = [c for c in df.columns if c in {"Data_Year", "Data Year", "Surveillance Year", "Dataset Year"}]
+    return df.drop(columns=drop_cols) if drop_cols else df
+
+
+def sanitize_feature_label(name):
+    text = str(name)
+    replacements = {
+        "Data_Year": "Temporal baseline",
+        "Data Year": "Temporal baseline",
+        "Surveillance Year": "Temporal baseline",
+        "Dataset Year": "Temporal baseline",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
+
 def render_disclaimer():
-    st.markdown("""
-    <div class="disclaimer-box">
-        <strong>Research / Educational Prototype — Not for Clinical Diagnosis or Treatment:</strong> 
-        Predictions and analytics presented in this system are statistical estimates derived from historical epidemiological surveillance data 
-        (CDC & FDA NARMS, 1996–2015). They must not replace in-vitro antimicrobial susceptibility testing (AST), clinical microbiology, or qualified medical judgment. 
-        This system does not prescribe, recommend, or select antimicrobial therapy for patients.
-    </div>
-    """, unsafe_allow_html=True)
+    st.warning(
+        "**Research / Educational Prototype — Not for Clinical Diagnosis or Treatment:** "
+        "Predictions and analytics are statistical estimates from CDC & FDA NARMS surveillance data. "
+        "They must not replace antimicrobial susceptibility testing (AST), clinical microbiology, "
+        "or qualified medical judgment. This system does not prescribe or select antimicrobial therapy."
+    )
 
 
 def main():
@@ -146,6 +131,9 @@ def main():
     cleaned_df = get_cached_dataset()
     metrics = get_cached_metrics()
     comp_df = get_cached_comparison_df()
+    coverage_years = data_coverage_years(cleaned_df, schema)
+    coverage_value = coverage_display(coverage_years)
+    data_year = internal_data_year(schema, cleaned_df)
 
     # Sidebar Navigation
     st.sidebar.title("AMR Intelligence")
@@ -172,8 +160,8 @@ def main():
     # PAGE 1: HOME
     # ==========================================
     if selection == "1. Home":
-        st.markdown('<div class="main-header">AI-Based Antibiotic Resistance Intelligence System</div>', unsafe_allow_html=True)
-        st.markdown('<div class="sub-header">Computational Decision-Support and Surveillance Intelligence Platform for Antimicrobial Resistance</div>', unsafe_allow_html=True)
+        st.title("AI-Based Antibiotic Resistance Intelligence System")
+        st.caption("Computational Decision-Support and Surveillance Intelligence Platform for Antimicrobial Resistance")
         
         render_disclaimer()
 
@@ -183,7 +171,7 @@ def main():
         with col2:
             st.metric("Target Antibiotics", "6 Monitored Drugs")
         with col3:
-            st.metric("Surveillance Horizon", "1996 – 2015 (20 yrs)")
+            st.metric("Data Coverage", coverage_value)
         with col4:
             st.metric("Model Paradigms", "ML + Transformer")
 
@@ -223,8 +211,8 @@ def main():
     # PAGE 2: DATASET OVERVIEW
     # ==========================================
     elif selection == "2. Dataset Overview":
-        st.markdown('<div class="main-header">Dataset Overview & Surveillance Cohort</div>', unsafe_allow_html=True)
-        st.markdown('<div class="sub-header">Exploratory inspection of the CDC & FDA National Antimicrobial Resistance Monitoring System (NARMS Now)</div>', unsafe_allow_html=True)
+        st.title("Dataset Overview & Surveillance Cohort")
+        st.caption("Exploratory inspection of the CDC & FDA National Antimicrobial Resistance Monitoring System (NARMS Now)")
         render_disclaimer()
 
         if cleaned_df.empty:
@@ -235,19 +223,33 @@ def main():
         c1.metric("Total Usable Observations", f"{len(cleaned_df):,}")
         c2.metric("Total Pathogen Genera", f"{cleaned_df['Genus'].nunique()}")
         c3.metric("Distinct Species", f"{cleaned_df['Species'].nunique()}")
-        c4.metric("Temporal Span", f"{cleaned_df['Data_Year'].min()} - {cleaned_df['Data_Year'].max()}")
+        c4.metric("Data Coverage", coverage_value)
 
         tab1, tab2, tab3 = st.tabs(["Pathogen Distributions", "Target Class Balance", "Raw Cohort Preview"])
         
         with tab1:
             col_a, col_b = st.columns(2)
             with col_a:
-                fig_gen = px.pie(cleaned_df, names="Genus", title="Isolates by Bacterial Genus", hole=0.4, template="plotly_white")
+                genus_counts = cleaned_df['Genus'].value_counts().reset_index()
+                genus_counts.columns = ['Genus', 'Count']
+                fig_gen = px.bar(
+                    genus_counts, x='Count', y='Genus', orientation='h',
+                    title="Isolate Count by Bacterial Genus",
+                    template="plotly_white",
+                    color_discrete_sequence=["#2563EB"]
+                )
+                fig_gen.update_layout(yaxis_title=None, xaxis_title="Isolate Count", showlegend=False)
                 st.plotly_chart(fig_gen, use_container_width=True)
             with col_b:
                 top_spec = cleaned_df['Species'].value_counts().head(8).reset_index()
                 top_spec.columns = ['Species', 'Count']
-                fig_spec = px.bar(top_spec, x='Count', y='Species', orientation='h', title="Top Bacterial Species", template="plotly_white")
+                fig_spec = px.bar(
+                    top_spec, x='Count', y='Species', orientation='h',
+                    title="Top 8 Bacterial Species by Isolate Count",
+                    template="plotly_white",
+                    color_discrete_sequence=["#475569"]
+                )
+                fig_spec.update_layout(yaxis_title=None, xaxis_title="Isolate Count", showlegend=False)
                 st.plotly_chart(fig_spec, use_container_width=True)
 
         with tab2:
@@ -268,13 +270,16 @@ def main():
             st.dataframe(pd.DataFrame(target_data), use_container_width=True)
 
         with tab3:
-            st.dataframe(cleaned_df.head(100), use_container_width=True)
+            st.dataframe(hide_year_columns(cleaned_df.head(100)), use_container_width=True)
 
         st.markdown("---")
         st.subheader("Missing Values, Features, and Temporal Coverage")
         miss_col1, miss_col2 = st.columns(2)
         with miss_col1:
-            feature_cols = schema["features"]["categorical"] + schema["features"]["numerical"]
+            feature_cols = [
+                c for c in (schema["features"]["categorical"] + schema["features"]["numerical"])
+                if c not in {"Data_Year"}
+            ]
             miss_df = pd.DataFrame({
                 "Feature": feature_cols,
                 "Missing Count": [int(cleaned_df[c].isna().sum()) if c in cleaned_df.columns else 0 for c in feature_cols],
@@ -285,8 +290,9 @@ def main():
             })
             st.dataframe(miss_df, use_container_width=True)
         with miss_col2:
-            st.write(f"**Year/date availability:** `Data_Year` is present for all records ({cleaned_df['Data_Year'].notna().sum():,} / {len(cleaned_df):,}).")
-            st.write(f"**Range:** {int(cleaned_df['Data_Year'].min())}–{int(cleaned_df['Data_Year'].max())}")
+            st.write(f"**Data Coverage:** {coverage_value}")
+            complete_n = int(cleaned_df["Data_Year"].notna().sum()) if "Data_Year" in cleaned_df.columns else len(cleaned_df)
+            st.write(f"**Coverage completeness:** {complete_n:,} / {len(cleaned_df):,} records")
             st.write(f"**Modeling features:** {len(schema['features']['categorical'])} categorical + {len(schema['features']['numerical'])} numerical")
             st.write("**Selected antibiotics:** " + ", ".join(v["display_name"] for v in schema["selected_antibiotics"].values()))
 
@@ -294,32 +300,27 @@ def main():
     # PAGE 3: RESISTANCE PREDICTION
     # ==========================================
     elif selection == "3. Resistance Prediction":
-        st.markdown('<div class="main-header">Antimicrobial Resistance Prediction</div>', unsafe_allow_html=True)
-        st.markdown('<div class="sub-header">Estimate resistance probability for individual bacterial isolates using trained AI models</div>', unsafe_allow_html=True)
+        st.title("Antimicrobial Resistance Prediction")
+        st.caption("Estimate resistance probability for individual bacterial isolates using trained AI models")
         render_disclaimer()
 
         st.subheader("1. Enter Isolate & Epidemiological Context")
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            genus = st.selectbox("Bacterial Genus", schema["categorical_values"]["Genus"], index=2 if "Salmonella" in schema["categorical_values"]["Genus"] else 0)
-            species = st.selectbox("Species", schema["categorical_values"]["Species"], index=4 if "enterica" in schema["categorical_values"]["Species"] else 0)
-            serotype = st.selectbox("Serotype Group", schema["categorical_values"]["Serotype_Grouped"], index=1 if "Enteritidis" in schema["categorical_values"]["Serotype_Grouped"] else 0)
 
-        with col2:
-            age_group = st.selectbox("Patient Age Bracket", schema["categorical_values"]["Age_Group"], index=3 if "20-29" in schema["categorical_values"]["Age_Group"] else 0)
-            region = st.selectbox("Surveillance Region", schema["categorical_values"]["Region_Name"])
-            specimen_source = st.selectbox("Specimen Source", schema["categorical_values"]["Specimen_Source"], index=0)
+        r1c1, r1c2, r1c3, r1c4 = st.columns(4)
+        genus = r1c1.selectbox("Bacterial Genus", schema["categorical_values"]["Genus"], index=2 if "Salmonella" in schema["categorical_values"]["Genus"] else 0)
+        species = r1c2.selectbox("Species", schema["categorical_values"]["Species"], index=4 if "enterica" in schema["categorical_values"]["Species"] else 0)
+        serotype = r1c3.selectbox("Serotype Group", schema["categorical_values"]["Serotype_Grouped"], index=1 if "Enteritidis" in schema["categorical_values"]["Serotype_Grouped"] else 0)
+        age_group = r1c4.selectbox("Patient Age Bracket", schema["categorical_values"]["Age_Group"], index=3 if "20-29" in schema["categorical_values"]["Age_Group"] else 0)
 
-        with col3:
-            data_year = 2015  # Fixed internally, UI removed
-            abx_choices = {v["display_name"]: k for k, v in schema["selected_antibiotics"].items()}
-            selected_abx_display = st.selectbox("Target Antibiotic", list(abx_choices.keys()))
-            selected_abx_key = abx_choices[selected_abx_display]
-
-            model_choices = ["Empirical Best Model", "Random Forest", "Gradient Boosting", "Logistic Regression", "Tabular Transformer"]
-            selected_model_choice = st.selectbox("Model Architecture", model_choices)
-            actual_model = None if selected_model_choice == "Empirical Best Model" else selected_model_choice
+        r2c1, r2c2, r2c3, r2c4 = st.columns(4)
+        region = r2c1.selectbox("Surveillance Region", schema["categorical_values"]["Region_Name"])
+        specimen_source = r2c2.selectbox("Specimen Source", schema["categorical_values"]["Specimen_Source"], index=0)
+        abx_choices = {v["display_name"]: k for k, v in schema["selected_antibiotics"].items()}
+        selected_abx_display = r2c3.selectbox("Target Antibiotic", list(abx_choices.keys()))
+        selected_abx_key = abx_choices[selected_abx_display]
+        model_choices = ["Empirical Best Model", "Random Forest", "Gradient Boosting", "Logistic Regression", "Tabular Transformer"]
+        selected_model_choice = r2c4.selectbox("Model Architecture", model_choices)
+        actual_model = None if selected_model_choice == "Empirical Best Model" else selected_model_choice
 
         sample_input = {
             "Genus": genus,
@@ -341,9 +342,9 @@ def main():
                 
                 with res_col1:
                     if pred["is_resistant"]:
-                        st.markdown(f'<div class="status-badge-res" style="font-size:1.1rem; padding:0.5rem 1rem;">PREDICTED: {pred["prediction"].upper()}</div>', unsafe_allow_html=True)
+                        st.error(f"PREDICTED: {pred['prediction'].upper()} (Resistant)")
                     else:
-                        st.markdown(f'<div class="status-badge-susc" style="font-size:1.1rem; padding:0.5rem 1rem;">PREDICTED: {pred["prediction"].upper()}</div>', unsafe_allow_html=True)
+                        st.success(f"PREDICTED: {pred['prediction'].upper()} (Susceptible)")
                     st.write(f"**Target**: {pred['antibiotic']} ({pred['drug_class']})")
                     st.write(f"**Architecture Used**: {pred['model_used']}")
 
@@ -360,9 +361,9 @@ def main():
                     anomaly_res = detect_anomaly(X_s)
                     st.write("**Baseline Normality**:")
                     if anomaly_res["is_anomaly"]:
-                        st.markdown('<span class="status-badge-res">Unusual Sample</span>', unsafe_allow_html=True)
+                        st.error("Unusual Sample")
                     else:
-                        st.markdown('<span class="status-badge-susc">Standard Sample</span>', unsafe_allow_html=True)
+                        st.success("Standard Sample")
                     st.caption(f"Score: {anomaly_res['anomaly_score']:.3f}")
 
             except Exception as e:
@@ -372,12 +373,12 @@ def main():
     # PAGE 4: RESISTANCE PROFILE
     # ==========================================
     elif selection == "4. Resistance Profile":
-        st.markdown('<div class="main-header">Multi-Antibiotic Resistance Profile</div>', unsafe_allow_html=True)
-        st.markdown('<div class="sub-header">Comprehensive multi-drug resistance panel across all monitored antibiotic classes</div>', unsafe_allow_html=True)
+        st.title("Multi-Antibiotic Resistance Profile")
+        st.caption("Comprehensive multi-drug resistance panel across all monitored antibiotic classes")
         render_disclaimer()
 
         # Clinical Safety Text Notice
-        st.markdown('<div class="safety-box"><strong>Clinical Safety Notice:</strong> Potential option for clinical review — requires clinical confirmation.</div>', unsafe_allow_html=True)
+        st.info("**Clinical Safety Notice:** Potential option for clinical review — requires clinical confirmation.")
 
         # Sample input bar
         st.subheader("Isolate Parameters")
@@ -394,7 +395,7 @@ def main():
             "Region_Name": "Region 1",
             "Age_Group": "20-29",
             "Specimen_Source": source,
-            "Data_Year": 2015
+            "Data_Year": data_year
         }
 
         profile = generate_resistance_profile(sample_input, include_shap=True)
@@ -410,27 +411,27 @@ def main():
                 "Resistance Probability",
                 "Confidence",
                 "SHAP 'Why?'"
-            ]]
+            ]].copy()
+            display_grid_df["SHAP 'Why?'"] = display_grid_df["SHAP 'Why?'"].map(sanitize_feature_label)
             st.dataframe(display_grid_df, use_container_width=True)
 
         with prof_col2:
-            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            st.metric("Resistant Targets", f"{profile['resistant_targets_count']} / {profile['total_targets']}")
-            st.write(f"**Profile Status**: {profile['mdr_status']}")
-            if profile["is_mdr"]:
-                st.markdown('<div class="status-badge-res">MDR Alert Detected</div>', unsafe_allow_html=True)
-            else:
-                st.markdown('<div class="status-badge-susc">Standard Resistance Profile</div>', unsafe_allow_html=True)
-            st.markdown(f'<div style="font-size:0.85rem; color:#1E40AF; margin-top:0.75rem; font-weight:500;">{profile["safety_guidance"]}</div>', unsafe_allow_html=True)
-            st.caption(profile["disclaimer"])
-            st.markdown('</div>', unsafe_allow_html=True)
+            with st.container(border=True):
+                st.metric("Resistant Targets", f"{profile['resistant_targets_count']} / {profile['total_targets']}")
+                st.write(f"**Profile Status**: {profile['mdr_status']}")
+                if profile["is_mdr"]:
+                    st.error("MDR Alert Detected")
+                else:
+                    st.success("Standard Resistance Profile")
+                st.info(profile["safety_guidance"])
+                st.caption(profile["disclaimer"])
 
     # ==========================================
     # PAGE 5: EXPLAINABLE AI (SHAP)
     # ==========================================
     elif selection == "5. Explainable AI (SHAP)":
-        st.markdown('<div class="main-header">Explainable AI (SHAP)</div>', unsafe_allow_html=True)
-        st.markdown('<div class="sub-header">Local sample attributions and global feature impact on AI resistance predictions</div>', unsafe_allow_html=True)
+        st.title("Explainable AI (SHAP)")
+        st.caption("Local sample attributions and global feature impact on AI resistance predictions")
         render_disclaimer()
 
         st.info("**Scientific attribution notice:** SHAP feature attributions describe mathematical feature contributions to the machine learning model's output. They do not represent direct biological mechanisms or causal laboratory proof.")
@@ -455,7 +456,7 @@ def main():
                 "Region_Name": "Region 1",
                 "Age_Group": "20-29",
                 "Specimen_Source": "Stool",
-                "Data_Year": 2015
+                "Data_Year": data_year
             }
 
             if st.button("Calculate SHAP Attribution", type="primary"):
@@ -464,6 +465,8 @@ def main():
                     
                     st.write(f"**Model Explainer**: {shap_res['model_used']}")
                     top_f = pd.DataFrame(shap_res["top_features"])
+                    if "feature" in top_f.columns:
+                        top_f["feature"] = top_f["feature"].map(sanitize_feature_label)
                     
                     fig = px.bar(
                         top_f.sort_values(by="shap_value", ascending=True),
@@ -472,12 +475,17 @@ def main():
                         orientation="h",
                         color="direction",
                         color_discrete_map={
-                            "Increases Resistance Probability": "#EF4444",
-                            "Decreases Resistance Probability": "#10B981"
+                            "Increases Resistance Probability": "#B91C1C",
+                            "Decreases Resistance Probability": "#166534"
                         },
-                        title=f"Local SHAP Feature Contributions for {sel_abx}",
-                        labels={"shap_value": "SHAP Value (Impact on Model Log-Odds)", "feature": "Feature Component"},
+                        title=f"Local SHAP Feature Contributions — {sel_abx}",
+                        labels={"shap_value": "SHAP Value (log-odds contribution)", "feature": "Feature"},
                         template="plotly_white"
+                    )
+                    fig.update_layout(
+                        legend_title_text="Direction",
+                        yaxis_title=None,
+                        margin=dict(l=0, r=0, t=40, b=0)
                     )
                     st.plotly_chart(fig, use_container_width=True)
 
@@ -485,24 +493,28 @@ def main():
             st.subheader(f"Global Feature Importance ({sel_abx})")
             global_imp = get_global_feature_importance(antibiotic=abx_k)
             imp_df = pd.DataFrame(global_imp)
+            if "feature" in imp_df.columns:
+                imp_df["feature"] = imp_df["feature"].map(sanitize_feature_label)
             
             fig_g = px.bar(
                 imp_df.sort_values(by="importance", ascending=True),
                 x="importance",
                 y="feature",
                 orientation="h",
-                title=f"Global Feature Importance Ranking ({sel_abx})",
-                labels={"importance": "Importance Metric", "feature": "Feature"},
-                template="plotly_white"
+                title=f"Global Feature Importance — {sel_abx}",
+                labels={"importance": "Importance Score", "feature": "Feature"},
+                template="plotly_white",
+                color_discrete_sequence=["#2563EB"]
             )
+            fig_g.update_layout(yaxis_title=None, showlegend=False, margin=dict(l=0, r=0, t=40, b=0))
             st.plotly_chart(fig_g, use_container_width=True)
 
     # ==========================================
     # PAGE 6: ANOMALY DETECTION
     # ==========================================
     elif selection == "6. Anomaly Detection":
-        st.markdown('<div class="main-header">Anomaly Detection</div>', unsafe_allow_html=True)
-        st.markdown('<div class="sub-header">Identify unusual isolate feature distributions relative to the 54,351-sample CDC baseline</div>', unsafe_allow_html=True)
+        st.title("Anomaly Detection")
+        st.caption("Identify unusual isolate feature distributions relative to the 54,351-sample CDC baseline")
         render_disclaimer()
 
         st.markdown("""
@@ -527,7 +539,7 @@ def main():
             "Region_Name": reg,
             "Age_Group": ag,
             "Specimen_Source": src,
-            "Data_Year": 2015
+            "Data_Year": data_year
         }
 
         if st.button("Evaluate Sample Normality", type="primary"):
@@ -540,9 +552,9 @@ def main():
             with col_l:
                 st.subheader("Normality Status")
                 if res_an["is_anomaly"]:
-                    st.markdown(f'<div class="status-badge-res" style="font-size:1.1rem; padding:0.5rem 1rem;">STATUS: {res_an["status"].upper()}</div>', unsafe_allow_html=True)
+                    st.error(f"STATUS: {res_an['status'].upper()}")
                 else:
-                    st.markdown(f'<div class="status-badge-susc" style="font-size:1.1rem; padding:0.5rem 1rem;">STATUS: {res_an["status"].upper()}</div>', unsafe_allow_html=True)
+                    st.success(f"STATUS: {res_an['status'].upper()}")
                 
                 st.write(f"**Decision Function Score**: `{res_an['anomaly_score']:.4f}`")
                 st.write(f"**Normality Index**: `{res_an['normality_index']*100:.1f}%`")
@@ -555,8 +567,8 @@ def main():
     # PAGE 7: STABILITY ANALYSIS
     # ==========================================
     elif selection == "7. Stability Analysis":
-        st.markdown('<div class="main-header">Model Output Stability Analysis</div>', unsafe_allow_html=True)
-        st.markdown('<div class="sub-header">Evaluate algorithmic prediction robustness under controlled input perturbations</div>', unsafe_allow_html=True)
+        st.title("Model Output Stability Analysis")
+        st.caption("Evaluate algorithmic prediction robustness under controlled input perturbations")
         render_disclaimer()
 
         abx_choices = {v["display_name"]: k for k, v in schema["selected_antibiotics"].items()}
@@ -575,7 +587,7 @@ def main():
             "Region_Name": "Region 1",
             "Age_Group": "20-29",
             "Specimen_Source": "Stool",
-            "Data_Year": 2015
+            "Data_Year": data_year
         }
 
         if st.button("Run Perturbation Stability Test", type="primary"):
@@ -595,14 +607,23 @@ def main():
                     st.write(f"Tested `{stab_res['total_perturbations_tested']}` controlled perturbations across age bracket and specimen source.")
 
                 st.subheader("Perturbation Output Breakdown")
-                st.dataframe(pd.DataFrame(stab_res["perturbation_details"]), use_container_width=True)
+                details_df = pd.DataFrame(stab_res["perturbation_details"])
+                if not details_df.empty:
+                    if "perturbation" in details_df.columns:
+                        details_df["perturbation"] = (
+                            details_df["perturbation"].astype(str)
+                            .str.replace(r"Surveillance Year adjusted to \d{4}\s*", "Temporal baseline offset ", regex=True)
+                        )
+                    if "perturbed_feature" in details_df.columns:
+                        details_df["perturbed_feature"] = details_df["perturbed_feature"].map(sanitize_feature_label)
+                st.dataframe(details_df, use_container_width=True)
 
     # ==========================================
     # PAGE 8: WHAT-IF ANALYSIS
     # ==========================================
     elif selection == "8. What-If Analysis":
-        st.markdown('<div class="main-header">What-If Scenario & Counterfactual Analysis</div>', unsafe_allow_html=True)
-        st.markdown('<div class="sub-header">Interactively test how changing specific features affects resistance probability</div>', unsafe_allow_html=True)
+        st.title("What-If Scenario & Counterfactual Analysis")
+        st.caption("Interactively test how changing specific features affects resistance probability")
         render_disclaimer()
 
         abx_choices = {v["display_name"]: k for k, v in schema["selected_antibiotics"].items()}
@@ -631,7 +652,7 @@ def main():
             "Region_Name": "Region 1",
             "Age_Group": b_ag,
             "Specimen_Source": b_src,
-            "Data_Year": 2015
+            "Data_Year": data_year
         }
 
         modifications = {
@@ -639,7 +660,7 @@ def main():
             "Species": m_spec,
             "Age_Group": m_ag,
             "Specimen_Source": m_src,
-            "Data_Year": 2015
+            "Data_Year": data_year
         }
 
         if st.button("Simulate Counterfactual Shift", type="primary"):
@@ -650,24 +671,21 @@ def main():
             
             c_a, c_b, c_c = st.columns(3)
             with c_a:
-                st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-                st.write("**Baseline Scenario**")
-                st.write(f"Prediction: `{whatif_res['original_prediction']}`")
-                st.write(f"Probability: `{whatif_res['original_probability']*100:.1f}%`")
-                st.markdown('</div>', unsafe_allow_html=True)
+                with st.container(border=True):
+                    st.markdown("**Baseline Scenario**")
+                    st.write(f"Prediction: `{whatif_res['original_prediction']}`")
+                    st.write(f"Probability: `{whatif_res['original_probability']*100:.1f}%`")
 
             with c_b:
-                st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-                st.write("**Counterfactual Scenario**")
-                st.write(f"Prediction: `{whatif_res['modified_prediction']}`")
-                st.write(f"Probability: `{whatif_res['modified_probability']*100:.1f}%`")
-                st.markdown('</div>', unsafe_allow_html=True)
+                with st.container(border=True):
+                    st.markdown("**Counterfactual Scenario**")
+                    st.write(f"Prediction: `{whatif_res['modified_prediction']}`")
+                    st.write(f"Probability: `{whatif_res['modified_probability']*100:.1f}%`")
 
             with c_c:
-                st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-                st.metric("Probability Delta (Δ)", f"{whatif_res['probability_delta_pct']:+.1f}%")
-                st.write(f"**Impact**: {whatif_res['sensitivity_impact']}")
-                st.markdown('</div>', unsafe_allow_html=True)
+                with st.container(border=True):
+                    st.metric("Probability Delta (Δ)", f"{whatif_res['probability_delta_pct']:+.1f}%")
+                    st.write(f"**Impact**: {whatif_res['sensitivity_impact']}")
 
             st.info(whatif_res["interpretation"])
             st.caption(whatif_res["disclaimer"])
@@ -676,8 +694,8 @@ def main():
     # PAGE 9: MODEL PERFORMANCE
     # ==========================================
     elif selection == "9. Model Performance":
-        st.markdown('<div class="main-header">Model Performance & Empirical Evaluation</div>', unsafe_allow_html=True)
-        st.markdown('<div class="sub-header">Empirical test partition results across all machine learning and deep learning architectures</div>', unsafe_allow_html=True)
+        st.title("Model Performance & Empirical Evaluation")
+        st.caption("Empirical test partition results across all machine learning and deep learning architectures")
         render_disclaimer()
 
         if comp_df.empty:
@@ -694,13 +712,12 @@ def main():
             for idx, (abx_k, b_info) in enumerate(metrics["best_models"].items()):
                 with b_cols[idx % len(b_cols)]:
                     abx_disp = schema["selected_antibiotics"][abx_k]["display_name"]
-                    st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-                    st.write(f"**{abx_disp}**")
-                    st.write(f"Architecture: `{b_info['model_name']}`")
-                    st.write(f"F1-Score: `{b_info['metrics']['f1_score']:.4f}`")
-                    st.write(f"ROC-AUC: `{b_info['metrics']['roc_auc']:.4f}`")
-                    st.write(f"Accuracy: `{b_info['metrics']['accuracy']:.4f}`")
-                    st.markdown('</div>', unsafe_allow_html=True)
+                    with st.container(border=True):
+                        st.write(f"**{abx_disp}**")
+                        st.write(f"Architecture: `{b_info['model_name']}`")
+                        st.write(f"F1-Score: `{b_info['metrics']['f1_score']:.4f}`")
+                        st.write(f"ROC-AUC: `{b_info['metrics']['roc_auc']:.4f}`")
+                        st.write(f"Accuracy: `{b_info['metrics']['accuracy']:.4f}`")
 
         st.markdown("---")
         st.subheader("Evaluation Visualizations")
@@ -724,11 +741,16 @@ def main():
     # PAGE 10: ABOUT
     # ==========================================
     elif selection == "10. About":
-        st.markdown('<div class="main-header">About the Project</div>', unsafe_allow_html=True)
-        st.markdown('<div class="sub-header">AI-Based Antibiotic Resistance Intelligence System (AMR-IS)</div>', unsafe_allow_html=True)
+        st.title("About the Project")
+        st.caption("AI-Based Antibiotic Resistance Intelligence System (AMR-IS)")
         render_disclaimer()
 
-        st.markdown("""
+        if not cleaned_df.empty:
+            record_count = f"{len(cleaned_df):,}"
+        else:
+            meta_n = schema.get("dataset_metadata", {}).get("total_cleaned_records")
+            record_count = f"{meta_n:,}" if meta_n else "N/A"
+        st.markdown(f"""
         ### 1. Problem Statement
         Antimicrobial Resistance (AMR) is a major global health threat. Rapid computational assessment of resistance patterns 
         from microbiological surveillance data can support epidemiologists and researchers in understanding resistance dynamics.
@@ -743,8 +765,8 @@ def main():
         - **Testing & Quality**: pytest
 
         ### 3. Methodology & Governance
-        - **Dataset**: Real CDC & FDA NARMS Now surveillance records (54,351 isolates, 1996–2015).
-        - **Strict Leakage Prevention**: Features restricted to microbiological, temporal, and patient context variables. Post-outcome test results and resistance genes are isolated.
+        - **Dataset**: Real CDC & FDA NARMS Now surveillance records ({record_count} isolates; Data Coverage: {coverage_value}).
+        - **Strict Leakage Prevention**: Features restricted to microbiological and patient context variables. Post-outcome test results and resistance genes are isolated.
         - **Multi-Model Evaluation**: Empirical benchmarking across architectures per antibiotic.
         - **No Retraining on Refresh**: Pre-fitted pipelines and saved checkpoints under `artifacts/` ensure instant response.
 
