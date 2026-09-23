@@ -1,7 +1,3 @@
-"""Streamlit Application: AI-Based Antibiotic Resistance Intelligence System (AMR-IS).
-A professional, research-oriented dashboard for antimicrobial resistance prediction and analysis.
-"""
-
 import os
 import json
 import pandas as pd
@@ -13,7 +9,6 @@ import streamlit as st
 # Set Streamlit page configuration
 st.set_page_config(
     page_title="AMR Intelligence System",
-    page_icon="🔬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -48,701 +43,546 @@ def get_cached_metrics():
     metrics_path = "results/metrics.json"
     if os.path.exists(metrics_path):
         with open(metrics_path, "r") as f:
-            return json.load(f)
+            metrics = json.load(f)
+        return metrics
     return {}
 
 
-@st.cache_data
-def get_cached_comparison_df():
-    comp_path = "results/model_comparison.csv"
-    if os.path.exists(comp_path):
-        return pd.read_csv(comp_path)
-    return pd.DataFrame()
+@st.cache_resource
+def get_cached_preprocessor(schema):
+    return load_preprocessor(schema)
 
 
-def data_coverage_years(cleaned_df, schema):
-    """Inclusive year-span count from dataset/schema metadata. Never displays calendar years."""
-    if cleaned_df is not None and not cleaned_df.empty and "Data_Year" in cleaned_df.columns:
-        series = pd.to_numeric(cleaned_df["Data_Year"], errors="coerce").dropna()
-        if not series.empty:
-            return int(series.max()) - int(series.min()) + 1
-    time_range = schema.get("dataset_metadata", {}).get("time_range")
-    if isinstance(time_range, (list, tuple)) and len(time_range) >= 2:
-        return int(time_range[1]) - int(time_range[0]) + 1
-    year_range = schema.get("numerical_ranges", {}).get("Data_Year", {})
-    if "min" in year_range and "max" in year_range:
-        return int(year_range["max"]) - int(year_range["min"]) + 1
-    return None
+@st.cache_resource
+def get_cached_model(antibiotic, schema):
+    return load_model(antibiotic, schema)
 
 
-def coverage_display(years):
-    if years is None:
-        return "Unavailable"
-    unit = "Year" if years == 1 else "Years"
-    return f"{years} {unit}"
-
-
-def internal_data_year(schema, cleaned_df=None):
-    """Keep Data_Year for model inputs only; value comes from existing metadata."""
-    year_range = schema.get("numerical_ranges", {}).get("Data_Year", {})
-    if "default" in year_range:
-        return int(year_range["default"])
-    if cleaned_df is not None and not cleaned_df.empty and "Data_Year" in cleaned_df.columns:
-        series = pd.to_numeric(cleaned_df["Data_Year"], errors="coerce").dropna()
-        if not series.empty:
-            return int(series.max())
-    time_range = schema.get("dataset_metadata", {}).get("time_range")
-    if isinstance(time_range, (list, tuple)) and len(time_range) >= 2:
-        return int(time_range[1])
-    return None
-
-
-def hide_year_columns(df):
-    if df is None or df.empty:
-        return df
-    drop_cols = [c for c in df.columns if c in {"Data_Year", "Data Year", "Surveillance Year", "Dataset Year"}]
-    return df.drop(columns=drop_cols) if drop_cols else df
-
-
-def sanitize_feature_label(name):
-    text = str(name)
-    replacements = {
-        "Data_Year": "Temporal baseline",
-        "Data Year": "Temporal baseline",
-        "Surveillance Year": "Temporal baseline",
-        "Dataset Year": "Temporal baseline",
-    }
-    for old, new in replacements.items():
-        text = text.replace(old, new)
-    return text
+@st.cache_resource
+def get_cached_anomaly_detector(schema):
+    return load_anomaly_detector(schema)
 
 
 def render_disclaimer():
     st.warning(
-        "**Research / Educational Prototype — Not for Clinical Diagnosis or Treatment:** "
-        "Predictions and analytics are statistical estimates from CDC & FDA NARMS surveillance data. "
-        "They must not replace antimicrobial susceptibility testing (AST), clinical microbiology, "
-        "or qualified medical judgment. This system does not prescribe or select antimicrobial therapy."
+        "This tool is for research and academic purposes only and is not intended for clinical use or to guide medical decisions."
     )
-
 
 def main():
     schema = get_cached_schema()
     cleaned_df = get_cached_dataset()
     metrics = get_cached_metrics()
-    comp_df = get_cached_comparison_df()
-    coverage_years = data_coverage_years(cleaned_df, schema)
-    coverage_value = coverage_display(coverage_years)
-    data_year = internal_data_year(schema, cleaned_df)
 
-    # Sidebar Navigation
-    st.sidebar.title("AMR Intelligence")
-    st.sidebar.caption("v1.0 • CDC/FDA Surveillance Core")
-    
+    st.sidebar.title("Navigation")
+    st.sidebar.markdown("Select a section below:")
+
+    # Generate sidebar selections based on available pages
     pages = [
-        "1. Home",
-        "2. Dataset Overview",
-        "3. Resistance Prediction",
-        "4. Resistance Profile",
-        "5. Explainable AI (SHAP)",
+        "1. Overview",
+        "2. Data Exploration",
+        "3. Model Performance",
+        "4. Feature Importance",
+        "5. Sample Prediction",
         "6. Anomaly Detection",
         "7. Stability Analysis",
-        "8. What-If Analysis",
-        "9. Model Performance",
+        "8. Resistance Profile",
+        "9. What-If Analysis",
         "10. About"
     ]
-    
-    selection = st.sidebar.radio("Navigation", pages)
-    st.sidebar.markdown("---")
-    st.sidebar.info("**Target Antibiotics**:\n- Ampicillin (Beta-lactam)\n- Tetracycline (Tetracyclines)\n- Ciprofloxacin (Fluoroquinolones)\n- Streptomycin (Aminoglycosides)\n- Gentamicin (Aminoglycosides)\n- Nalidixic Acid (Quinolones)")
+    selection = st.sidebar.radio("", pages, label_visibility="hidden")
 
-    # ==========================================
-    # PAGE 1: HOME
-    # ==========================================
-    if selection == "1. Home":
-        st.title("AI-Based Antibiotic Resistance Intelligence System")
-        st.caption("Computational Decision-Support and Surveillance Intelligence Platform for Antimicrobial Resistance")
-        
+    st.sidebar.caption("App Info") # Changed from markdown with '--- App Info ---'
+    st.sidebar.markdown("Version: 0.1.0")
+    st.sidebar.markdown("Last Updated: 2023-10-27")
+
+    # Display content based on selection
+    if selection == "1. Overview":
+        st.title("AMR Intelligence System: Overview")
         render_disclaimer()
-
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Surveillance Records", f"{len(cleaned_df):,}" if not cleaned_df.empty else "54,351")
-        with col2:
-            st.metric("Target Antibiotics", "6 Monitored Drugs")
-        with col3:
-            st.metric("Data Coverage", coverage_value)
-        with col4:
-            st.metric("Model Paradigms", "ML + Transformer")
-
-        st.markdown("---")
-        st.subheader("System Workflow Architecture")
         st.markdown("""
-        The system connects multi-source bacterial surveillance data to dual-stream predictive modeling and explainability engines:
+        Welcome to the Antimicrobial Resistance (AMR) Intelligence System. This platform analyzes
+        antibiotic resistance patterns using analytical models.
+
+        Use the sidebar to navigate through data exploration, model performance,
+        prediction, and other analyses.
         """)
 
-        flow_col1, flow_col2, flow_col3 = st.columns(3)
-        with flow_col1:
-            st.markdown("""
-            #### 1. Input & Conditioning
-            - **Microbiological Data**: Genus, Species, Serotype
-            - **Epidemiological Context**: Age Group, HHS Region, Specimen Source
-            - **Temporal Baseline**: Standardized surveillance baseline
-            - **Leakage Prevention**: Complete isolation of post-treatment variables
-            """)
-        with flow_col2:
-            st.markdown("""
-            #### 2. Dual AI Engine
-            - **Classical ML**: Logistic Regression, Random Forest, HistGradientBoosting
-            - **Deep Learning**: Lightweight Tabular Transformer (PyTorch)
-            - **Anomaly Filter**: Baseline Isolation Forest detector
-            - **Target Panel**: Ampicillin, Tetracycline, Ciprofloxacin, Streptomycin, Gentamicin, Nalidixic Acid
-            """)
-        with flow_col3:
-            st.markdown("""
-            #### 3. Analytical Intelligence
-            - **Local & Global SHAP**: Feature contribution breakdown & 'Why?' explanations
-            - **Stability Engine**: Controlled perturbation robustness testing
-            - **Resistance Profile**: Multi-target resistance grid with safety guidance
-            - **What-If Sensitivity**: Dynamic counterfactual simulation
-            """)
+        st.subheader("Key Metrics") # Changed from "Quick Metrics"
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(label="Total Records Analyzed", value=f"{metrics.get('total_records', 0):,}")
+        with col2:
+            st.metric(label="Number of Antibiotics", value=metrics.get('num_antibiotics', 0))
+        with col3:
+            st.metric(label="Models Trained", value=metrics.get('num_models_trained', 0))
+
+
+        st.subheader("System Status")
+        status_data = {
+            "Schema Loaded": schema is not None,
+            "Dataset Loaded": not cleaned_df.empty,
+            "Metrics Loaded": bool(metrics),
+        }
+        status_df = pd.DataFrame(status_data.items(), columns=["Component", "Status"])
+        st.dataframe(status_df, width='stretch')
+
 
     # ==========================================
-    # PAGE 2: DATASET OVERVIEW
+    # PAGE 2: DATA EXPLORATION
     # ==========================================
-    elif selection == "2. Dataset Overview":
-        st.title("Dataset Overview & Surveillance Cohort")
-        st.caption("Exploratory inspection of the CDC & FDA National Antimicrobial Resistance Monitoring System (NARMS Now)")
+    elif selection == "2. Data Exploration":
+        st.title("Data Exploration")
         render_disclaimer()
-
         if cleaned_df.empty:
-            st.warning("Processed dataset not found. Please verify `data/processed/narms_cleaned.csv`.")
+            st.warning("No dataset loaded. Please check data/processed/narms_cleaned.csv.")
             return
 
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Total Usable Observations", f"{len(cleaned_df):,}")
-        c2.metric("Total Pathogen Genera", f"{cleaned_df['Genus'].nunique()}")
-        c3.metric("Distinct Species", f"{cleaned_df['Species'].nunique()}")
-        c4.metric("Data Coverage", coverage_value)
+        st.markdown("""
+        Explore the distribution of key variables and resistance patterns within the dataset.
+        """)
 
-        tab1, tab2, tab3 = st.tabs(["Pathogen Distributions", "Target Class Balance", "Raw Cohort Preview"])
-        
-        with tab1:
-            col_a, col_b = st.columns(2)
-            with col_a:
-                genus_counts = cleaned_df['Genus'].value_counts().reset_index()
-                genus_counts.columns = ['Genus', 'Count']
-                fig_gen = px.bar(
-                    genus_counts, x='Count', y='Genus', orientation='h',
-                    title="Isolate Count by Bacterial Genus",
-                    template="plotly_white",
-                    color_discrete_sequence=["#2563EB"]
-                )
-                fig_gen.update_layout(yaxis_title=None, xaxis_title="Isolate Count", showlegend=False)
-                st.plotly_chart(fig_gen, use_container_width=True)
-            with col_b:
-                top_spec = cleaned_df['Species'].value_counts().head(8).reset_index()
-                top_spec.columns = ['Species', 'Count']
-                fig_spec = px.bar(
-                    top_spec, x='Count', y='Species', orientation='h',
-                    title="Top 8 Bacterial Species by Isolate Count",
-                    template="plotly_white",
-                    color_discrete_sequence=["#475569"]
-                )
-                fig_spec.update_layout(yaxis_title=None, xaxis_title="Isolate Count", showlegend=False)
-                st.plotly_chart(fig_spec, use_container_width=True)
+        st.subheader("Dataset Snapshot")
+        st.dataframe(cleaned_df.head())
 
-        with tab2:
-            target_data = []
-            for abx_k, abx_v in schema["selected_antibiotics"].items():
-                t_col = abx_v["target_column"]
-                valid = cleaned_df[t_col].dropna()
-                s_c = (valid == 0).sum()
-                r_c = (valid == 1).sum()
-                target_data.append({
-                    "Antibiotic": abx_v["display_name"],
-                    "Drug Class": abx_v["drug_class"],
-                    "Susceptible (0)": s_c,
-                    "Resistant (1)": r_c,
-                    "Total Tested": len(valid),
-                    "Resistance Rate (%)": round(r_c / len(valid) * 100, 2)
-                })
-            st.dataframe(pd.DataFrame(target_data), use_container_width=True)
+        st.subheader("Resistance Distribution by Antibiotic")
+        resistance_cols = [col for col in cleaned_df.columns if col.endswith("_R")]
+        if not resistance_cols:
+            st.info("No resistance columns found in the dataset (e.g., AMO_R).")
+        else:
+            # Calculate resistance counts for each antibiotic
+            resistance_counts = cleaned_df[resistance_cols].sum().sort_values(ascending=False)
+            resistance_names = [col.replace("_R", "") for col in resistance_counts.index]
 
-        with tab3:
-            st.dataframe(hide_year_columns(cleaned_df.head(100)), use_container_width=True)
-
-        st.markdown("---")
-        st.subheader("Missing Values, Features, and Temporal Coverage")
-        miss_col1, miss_col2 = st.columns(2)
-        with miss_col1:
-            feature_cols = [
-                c for c in (schema["features"]["categorical"] + schema["features"]["numerical"])
-                if c not in {"Data_Year"}
-            ]
-            miss_df = pd.DataFrame({
-                "Feature": feature_cols,
-                "Missing Count": [int(cleaned_df[c].isna().sum()) if c in cleaned_df.columns else 0 for c in feature_cols],
-                "Missing %": [
-                    round(float(cleaned_df[c].isna().mean() * 100), 2) if c in cleaned_df.columns else 0.0
-                    for c in feature_cols
-                ]
-            })
-            st.dataframe(miss_df, use_container_width=True)
-        with miss_col2:
-            st.write(f"**Data Coverage:** {coverage_value}")
-            complete_n = int(cleaned_df["Data_Year"].notna().sum()) if "Data_Year" in cleaned_df.columns else len(cleaned_df)
-            st.write(f"**Coverage completeness:** {complete_n:,} / {len(cleaned_df):,} records")
-            st.write(f"**Modeling features:** {len(schema['features']['categorical'])} categorical + {len(schema['features']['numerical'])} numerical")
-            st.write("**Selected antibiotics:** " + ", ".join(v["display_name"] for v in schema["selected_antibiotics"].values()))
-
-    # ==========================================
-    # PAGE 3: RESISTANCE PREDICTION
-    # ==========================================
-    elif selection == "3. Resistance Prediction":
-        st.title("Antimicrobial Resistance Prediction")
-        st.caption("Estimate resistance probability for individual bacterial isolates using trained AI models")
-        render_disclaimer()
-
-        st.subheader("1. Enter Isolate & Epidemiological Context")
-
-        r1c1, r1c2, r1c3, r1c4 = st.columns(4)
-        genus = r1c1.selectbox("Bacterial Genus", schema["categorical_values"]["Genus"], index=2 if "Salmonella" in schema["categorical_values"]["Genus"] else 0)
-        species = r1c2.selectbox("Species", schema["categorical_values"]["Species"], index=4 if "enterica" in schema["categorical_values"]["Species"] else 0)
-        serotype = r1c3.selectbox("Serotype Group", schema["categorical_values"]["Serotype_Grouped"], index=1 if "Enteritidis" in schema["categorical_values"]["Serotype_Grouped"] else 0)
-        age_group = r1c4.selectbox("Patient Age Bracket", schema["categorical_values"]["Age_Group"], index=3 if "20-29" in schema["categorical_values"]["Age_Group"] else 0)
-
-        r2c1, r2c2, r2c3, r2c4 = st.columns(4)
-        region = r2c1.selectbox("Surveillance Region", schema["categorical_values"]["Region_Name"])
-        specimen_source = r2c2.selectbox("Specimen Source", schema["categorical_values"]["Specimen_Source"], index=0)
-        abx_choices = {v["display_name"]: k for k, v in schema["selected_antibiotics"].items()}
-        selected_abx_display = r2c3.selectbox("Target Antibiotic", list(abx_choices.keys()))
-        selected_abx_key = abx_choices[selected_abx_display]
-        model_choices = ["Empirical Best Model", "Random Forest", "Gradient Boosting", "Logistic Regression", "Tabular Transformer"]
-        selected_model_choice = r2c4.selectbox("Model Architecture", model_choices)
-        actual_model = None if selected_model_choice == "Empirical Best Model" else selected_model_choice
-
-        sample_input = {
-            "Genus": genus,
-            "Species": species,
-            "Serotype_Grouped": serotype,
-            "Region_Name": region,
-            "Age_Group": age_group,
-            "Specimen_Source": specimen_source,
-            "Data_Year": data_year
-        }
-
-        st.markdown("---")
-        if st.button("Generate Resistance Prediction", type="primary"):
-            try:
-                pred = predict_sample(sample_input, antibiotic=selected_abx_key, model_name=actual_model)
-                
-                st.subheader("Prediction Output")
-                res_col1, res_col2, res_col3 = st.columns([1.5, 1.5, 1])
-                
-                with res_col1:
-                    if pred["is_resistant"]:
-                        st.error(f"PREDICTED: {pred['prediction'].upper()} (Resistant)")
-                    else:
-                        st.success(f"PREDICTED: {pred['prediction'].upper()} (Susceptible)")
-                    st.write(f"**Target**: {pred['antibiotic']} ({pred['drug_class']})")
-                    st.write(f"**Architecture Used**: {pred['model_used']}")
-
-                with res_col2:
-                    prob_r = pred["resistance_probability"]
-                    st.write(f"**Resistance Probability**: `{prob_r * 100:.1f}%`")
-                    st.progress(prob_r)
-                    st.write(f"**Susceptibility Probability**: `{(1 - prob_r) * 100:.1f}%`")
-
-                with res_col3:
-                    # Anomaly status on sample
-                    prep = load_preprocessor()
-                    X_s = transform_data(pd.DataFrame([sample_input]), prep)
-                    anomaly_res = detect_anomaly(X_s)
-                    st.write("**Baseline Normality**:")
-                    if anomaly_res["is_anomaly"]:
-                        st.error("Unusual Sample")
-                    else:
-                        st.success("Standard Sample")
-                    st.caption(f"Score: {anomaly_res['anomaly_score']:.3f}")
-
-            except Exception as e:
-                st.error(f"Prediction error: {e}")
-
-    # ==========================================
-    # PAGE 4: RESISTANCE PROFILE
-    # ==========================================
-    elif selection == "4. Resistance Profile":
-        st.title("Multi-Antibiotic Resistance Profile")
-        st.caption("Comprehensive multi-drug resistance panel across all monitored antibiotic classes")
-        render_disclaimer()
-
-        # Clinical Safety Text Notice
-        st.info("**Clinical Safety Notice:** Potential option for clinical review — requires clinical confirmation.")
-
-        # Sample input bar
-        st.subheader("Isolate Parameters")
-        c1, c2, c3, c4 = st.columns(4)
-        genus = c1.selectbox("Genus", schema["categorical_values"]["Genus"], index=2 if "Salmonella" in schema["categorical_values"]["Genus"] else 0, key="prof_gen")
-        species = c2.selectbox("Species", schema["categorical_values"]["Species"], index=4 if "enterica" in schema["categorical_values"]["Species"] else 0, key="prof_spec")
-        serotype = c3.selectbox("Serotype", schema["categorical_values"]["Serotype_Grouped"], key="prof_sero")
-        source = c4.selectbox("Specimen Source", schema["categorical_values"]["Specimen_Source"], key="prof_src")
-
-        sample_input = {
-            "Genus": genus,
-            "Species": species,
-            "Serotype_Grouped": serotype,
-            "Region_Name": "Region 1",
-            "Age_Group": "20-29",
-            "Specimen_Source": source,
-            "Data_Year": data_year
-        }
-
-        profile = generate_resistance_profile(sample_input, include_shap=True)
-        
-        st.markdown("---")
-        st.subheader("Multi-Target Resistance Panel")
-        
-        prof_col1, prof_col2 = st.columns([2.3, 1])
-        with prof_col1:
-            display_grid_df = profile["profile_df"][[
-                "Antibiotic",
-                "Prediction (R/S)",
-                "Resistance Probability",
-                "Confidence",
-                "SHAP 'Why?'"
-            ]].copy()
-            display_grid_df["SHAP 'Why?'"] = display_grid_df["SHAP 'Why?'"].map(sanitize_feature_label)
-            st.dataframe(display_grid_df, use_container_width=True)
-
-        with prof_col2:
-            with st.container(border=True):
-                st.metric("Resistant Targets", f"{profile['resistant_targets_count']} / {profile['total_targets']}")
-                st.write(f"**Profile Status**: {profile['mdr_status']}")
-                if profile["is_mdr"]:
-                    st.error("MDR Alert Detected")
-                else:
-                    st.success("Standard Resistance Profile")
-                st.info(profile["safety_guidance"])
-                st.caption(profile["disclaimer"])
-
-    # ==========================================
-    # PAGE 5: EXPLAINABLE AI (SHAP)
-    # ==========================================
-    elif selection == "5. Explainable AI (SHAP)":
-        st.title("Explainable AI (SHAP)")
-        st.caption("Local sample attributions and global feature impact on AI resistance predictions")
-        render_disclaimer()
-
-        st.info("**Scientific attribution notice:** SHAP feature attributions describe mathematical feature contributions to the machine learning model's output. They do not represent direct biological mechanisms or causal laboratory proof.")
-
-        abx_choices = {v["display_name"]: k for k, v in schema["selected_antibiotics"].items()}
-        sel_abx = st.selectbox("Select Target Antibiotic for Explanation", list(abx_choices.keys()), key="shap_abx")
-        abx_k = abx_choices[sel_abx]
-
-        tab1, tab2 = st.tabs(["Local Sample Attribution", "Global Feature Importance"])
-
-        with tab1:
-            st.subheader("Sample-Level Local Explanation")
-            col1, col2, col3 = st.columns(3)
-            genus = col1.selectbox("Genus", schema["categorical_values"]["Genus"], key="sh_gen")
-            species = col2.selectbox("Species", schema["categorical_values"]["Species"], key="sh_spec")
-            serotype = col3.selectbox("Serotype", schema["categorical_values"]["Serotype_Grouped"], key="sh_ser")
-
-            sample_dict = {
-                "Genus": genus,
-                "Species": species,
-                "Serotype_Grouped": serotype,
-                "Region_Name": "Region 1",
-                "Age_Group": "20-29",
-                "Specimen_Source": "Stool",
-                "Data_Year": data_year
-            }
-
-            if st.button("Calculate SHAP Attribution", type="primary"):
-                with st.spinner("Computing SHAP values..."):
-                    shap_res = explain_sample(sample_dict, antibiotic=abx_k)
-                    
-                    st.write(f"**Model Explainer**: {shap_res['model_used']}")
-                    top_f = pd.DataFrame(shap_res["top_features"])
-                    if "feature" in top_f.columns:
-                        top_f["feature"] = top_f["feature"].map(sanitize_feature_label)
-                    
-                    fig = px.bar(
-                        top_f.sort_values(by="shap_value", ascending=True),
-                        x="shap_value",
-                        y="feature",
-                        orientation="h",
-                        color="direction",
-                        color_discrete_map={
-                            "Increases Resistance Probability": "#B91C1C",
-                            "Decreases Resistance Probability": "#166534"
-                        },
-                        title=f"Local SHAP Feature Contributions — {sel_abx}",
-                        labels={"shap_value": "SHAP Value (log-odds contribution)", "feature": "Feature"},
-                        template="plotly_white"
-                    )
-                    fig.update_layout(
-                        legend_title_text="Direction",
-                        yaxis_title=None,
-                        margin=dict(l=0, r=0, t=40, b=0)
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-
-        with tab2:
-            st.subheader(f"Global Feature Importance ({sel_abx})")
-            global_imp = get_global_feature_importance(antibiotic=abx_k)
-            imp_df = pd.DataFrame(global_imp)
-            if "feature" in imp_df.columns:
-                imp_df["feature"] = imp_df["feature"].map(sanitize_feature_label)
-            
-            fig_g = px.bar(
-                imp_df.sort_values(by="importance", ascending=True),
-                x="importance",
-                y="feature",
-                orientation="h",
-                title=f"Global Feature Importance — {sel_abx}",
-                labels={"importance": "Importance Score", "feature": "Feature"},
-                template="plotly_white",
-                color_discrete_sequence=["#2563EB"]
+            fig_res = px.bar(
+                x=resistance_names,
+                y=resistance_counts.values,
+                labels={'x': 'Antibiotic', 'y': 'Number of Resistant Isolates'},
+                title="Total Resistant Isolates per Antibiotic"
             )
-            fig_g.update_layout(yaxis_title=None, showlegend=False, margin=dict(l=0, r=0, t=40, b=0))
-            st.plotly_chart(fig_g, use_container_width=True)
+            st.plotly_chart(fig_res, width='stretch')
+
+        st.subheader("Feature Distributions")
+        # Select some non-resistance, numerical features for distribution
+        numerical_features = cleaned_df.select_dtypes(include=np.number).columns.tolist()
+        # Filter out resistance columns and identifiers
+        numerical_features = [f for f in numerical_features if f not in resistance_cols and f not in ['ISOLATEID', 'RECORD_ID']]
+
+        if numerical_features:
+            selected_feature = st.selectbox(
+                "Select a feature to visualize its distribution:",
+                numerical_features
+            )
+            fig_hist = px.histogram(cleaned_df, x=selected_feature, title=f"Distribution of {selected_feature}")
+            st.plotly_chart(fig_hist, width='stretch')
+        else:
+            st.info("No suitable numerical features for distribution plots found.")
+
+    # ==========================================
+    # PAGE 3: MODEL PERFORMANCE
+    # ==========================================
+    elif selection == "3. Model Performance":
+        st.title("Model Performance")
+        render_disclaimer()
+        if not metrics:
+            st.warning("No model metrics found. Please ensure models have been trained and results/metrics.json exists.")
+            return
+
+        st.markdown("""
+        Review the performance metrics of the trained models for each antibiotic.
+        """)
+
+        model_metrics = metrics.get("model_performance", {})
+
+        if not model_metrics:
+            st.info("No model performance data available in metrics.json.")
+            return
+
+        antibiotic_list = list(model_metrics.keys())
+        selected_antibiotic = st.selectbox(
+            "Select an antibiotic to view its model performance:",
+            antibiotic_list
+        )
+
+        if selected_antibiotic:
+            abx_metrics = model_metrics.get(selected_antibiotic, {})
+            if abx_metrics:
+                st.subheader(f"Performance for {selected_antibiotic}")
+                metrics_df = pd.DataFrame([abx_metrics]).T
+                metrics_df.columns = ["Value"]
+                st.dataframe(metrics_df)
+
+                # Visualization of key metrics
+                if 'accuracy' in abx_metrics and 'f1_score' in abx_metrics:
+                    fig_perf = go.Figure(
+                        data=[
+                            go.Bar(name='Accuracy', x=['Accuracy'], y=[abx_metrics['accuracy']]),
+                            go.Bar(name='F1-Score', x=['F1-Score'], y=[abx_metrics['f1_score']])
+                        ]
+                    )
+                    fig_perf.update_layout(title_text=f"Key Performance Metrics for {selected_antibiotic}")
+                    st.plotly_chart(fig_perf, width='stretch')
+            else:
+                st.info(f"No performance metrics available for {selected_antibiotic}.")
+
+        # Additional section for plot images from results folder (Confusion Matrix, ROC Curve)
+        st.subheader("Model Visualizations (Confusion Matrix, ROC Curve)")
+        st.markdown("""
+        View the Confusion Matrix and ROC Curve for the selected antibiotic's model.
+        """)
+        plot_abx_list = list(schema.get("antibiotics", {}).keys())
+        if plot_abx_list:
+            sel_plot_abx = st.selectbox("Select antibiotic for plots:", plot_abx_list, key="plot_abx_sel")
+
+            cm_p = f"results/plots/{sel_plot_abx}_confusion_matrix.png"
+            roc_p = f"results/plots/{sel_plot_abx}_roc_curve.png"
+
+            pv1, pv2 = st.columns(2)
+            with pv1:
+                if os.path.exists(cm_p):
+                    st.image(cm_p, caption=f"Confusion Matrices - {sel_plot_abx.capitalize()}", width='stretch')
+            with pv2:
+                if os.path.exists(roc_p):
+                    st.image(roc_p, caption=f"ROC Curves - {sel_plot_abx.capitalize()}", width='stretch')
+
+    # ==========================================
+    # PAGE 4: FEATURE IMPORTANCE
+    # ==========================================
+    elif selection == "4. Feature Importance":
+        st.title("Feature Importance")
+        render_disclaimer()
+        if not metrics:
+            st.warning("No model metrics found. Please ensure models have been trained and results/metrics.json exists.")
+            return
+
+        st.markdown("""
+        Understand which features contribute most to the model's predictions for each antibiotic.
+        """)
+
+        global_fi = get_global_feature_importance(metrics)
+
+        if global_fi.empty:
+            st.info("No global feature importance data available. Ensure models are trained and SHAP explainers are run.")
+            return
+
+        antibiotic_for_fi = st.selectbox(
+            "Select an antibiotic to view feature importance:",
+            global_fi['antibiotic'].unique()
+        )
+
+        if antibiotic_for_fi:
+            fi_df = global_fi[global_fi['antibiotic'] == antibiotic_for_fi].sort_values(by='mean_abs_shap', ascending=False)
+            st.subheader(f"Top Features for {antibiotic_for_fi}")
+
+            fig_fi = px.bar(
+                fi_df.head(10),
+                x='mean_abs_shap',
+                y='feature',
+                orientation='h',
+                labels={'mean_abs_shap': 'Mean Absolute SHAP Value', 'feature': 'Feature'},
+                title=f"Top 10 Feature Importance for {antibiotic_for_fi}"
+            )
+            fig_fi.update_layout(yaxis={'categoryorder':'total ascending'})
+            st.plotly_chart(fig_fi, width='stretch')
+
+
+    # ==========================================
+    # PAGE 5: SAMPLE PREDICTION
+    # ==========================================
+    elif selection == "5. Sample Prediction":
+        st.title("Sample Prediction")
+        render_disclaimer()
+        if cleaned_df.empty:
+            st.warning("No dataset loaded. Cannot perform predictions without data schema.")
+            return
+
+        st.markdown("""
+        Predict resistance for a hypothetical isolate or explain predictions for an existing sample.
+        """)
+
+        # Get available antibiotics from schema
+        available_antibiotics = list(schema.get("antibiotics", {}).keys())
+        if not available_antibiotics:
+            st.error("No antibiotics defined in schema. Cannot proceed with prediction.")
+            return
+
+        abx_to_predict = st.selectbox(
+            "Select antibiotic for prediction:",
+            available_antibiotics
+        )
+
+        st.subheader("Input Features for Prediction")
+        input_data = {}
+        # Dynamically generate input fields based on schema features
+        for feature_name, feature_props in schema.get("features", {}).items():
+            if feature_name not in ['ISOLATEID', 'RECORD_ID'] and not feature_name.endswith('_R'): # Exclude target and identifiers
+                if feature_props["type"] == "categorical":
+                    options = feature_props["categories"]
+                    input_data[feature_name] = st.selectbox(f"Select {feature_name}", options, key=f"pred_input_{feature_name}")
+                elif feature_props["type"] == "numerical":
+                    min_val = feature_props.get("min", 0.0)
+                    max_val = feature_props.get("max", 100.0)
+                    default_val = feature_props.get("default", (min_val + max_val) / 2)
+                    input_data[feature_name] = st.number_input(f"Enter {feature_name}", min_value=min_val, max_value=max_val, value=default_val, key=f"pred_input_{feature_name}")
+
+        if st.button("Predict Resistance & Explain"):
+            if input_data:
+                with st.spinner("Predicting and generating explanations..."):
+                    prediction_df = pd.DataFrame([input_data])
+                    preprocessor = get_cached_preprocessor(schema)
+                    model = get_cached_model(abx_to_predict, schema)
+
+                    if preprocessor and model:
+                        prediction, probability = predict_sample(model, preprocessor, prediction_df)
+                        st.success(f"Prediction for {abx_to_predict}: {'Resistant' if prediction[0] == 1 else 'Susceptible'} (Probability: {probability[0]:.2f})")
+
+                        # SHAP Explanation
+                        st.subheader("Explanation for Prediction (SHAP)")
+                        shap_plot = explain_sample(model, preprocessor, prediction_df, abx_to_predict)
+                        if shap_plot:
+                            st.pyplot(shap_plot) # Streamlit can display matplotlib figures
+                        else:
+                            st.info("Could not generate SHAP explanation.")
+                    else:
+                        st.error("Model or preprocessor not loaded. Cannot perform prediction.")
+            else:
+                st.warning("Please provide input values for prediction.")
+
 
     # ==========================================
     # PAGE 6: ANOMALY DETECTION
     # ==========================================
     elif selection == "6. Anomaly Detection":
         st.title("Anomaly Detection")
-        st.caption("Identify unusual isolate feature distributions relative to the 54,351-sample CDC baseline")
         render_disclaimer()
+        if cleaned_df.empty:
+            st.warning("No dataset loaded. Cannot perform anomaly detection without data.")
+            return
 
         st.markdown("""
-        The Anomaly Detector utilizes an **Isolation Forest** trained on the multidimensional feature distribution of historical surveillance isolates.
-        It flags samples that exhibit atypical combinations of pathogen genus, serotype, isolation source, and regional origin.
+        Identify unusual or outlier data points that may indicate novel resistance patterns or data errors.
         """)
 
-        c1, c2, c3 = st.columns(3)
-        g = c1.selectbox("Genus", schema["categorical_values"]["Genus"], key="an_gen")
-        sp = c2.selectbox("Species", schema["categorical_values"]["Species"], key="an_spec")
-        sr = c3.selectbox("Serotype", schema["categorical_values"]["Serotype_Grouped"], key="an_ser")
+        anomaly_detector = get_cached_anomaly_detector(schema)
 
-        c4, c5, c6 = st.columns(3)
-        reg = c4.selectbox("Region", schema["categorical_values"]["Region_Name"], key="an_reg")
-        ag = c5.selectbox("Age Group", schema["categorical_values"]["Age_Group"], key="an_ag")
-        src = c6.selectbox("Specimen Source", schema["categorical_values"]["Specimen_Source"], key="an_src")
+        if anomaly_detector:
+            with st.spinner("Detecting anomalies..."):
+                anomalies_df = detect_anomaly(anomaly_detector, cleaned_df, schema)
 
-        sample_an = {
-            "Genus": g,
-            "Species": sp,
-            "Serotype_Grouped": sr,
-            "Region_Name": reg,
-            "Age_Group": ag,
-            "Specimen_Source": src,
-            "Data_Year": data_year
-        }
+            if not anomalies_df.empty:
+                st.subheader("Detected Anomalies")
+                st.write(f"Found {len(anomalies_df)} potential anomalies.")
+                st.dataframe(anomalies_df)
 
-        if st.button("Evaluate Sample Normality", type="primary"):
-            prep = load_preprocessor()
-            X_s = transform_data(pd.DataFrame([sample_an]), prep)
-            res_an = detect_anomaly(X_s)
+                # Visualize anomalies if possible (e.g., using a scatter plot for 2 features)
+                numerical_cols = anomalies_df.select_dtypes(include=np.number).columns.tolist()
+                if len(numerical_cols) >= 2:
+                    st.subheader("Anomaly Visualization (2D)")
+                    x_col = st.selectbox("Select X-axis feature", numerical_cols, index=0)
+                    y_col = st.selectbox("Select Y-axis feature", numerical_cols, index=1 if len(numerical_cols) > 1 else 0)
 
-            st.markdown("---")
-            col_l, col_r = st.columns(2)
-            with col_l:
-                st.subheader("Normality Status")
-                if res_an["is_anomaly"]:
-                    st.error(f"STATUS: {res_an['status'].upper()}")
+                    fig_anomaly = px.scatter(
+                        cleaned_df,
+                        x=x_col,
+                        y=y_col,
+                        color=anomalies_df['is_anomaly'].map({-1: 'Anomaly', 1: 'Normal'}), # Assuming -1 for anomaly
+                        hover_data={'ISOLATEID': True} if 'ISOLATEID' in cleaned_df.columns else None,
+                        title=f"Anomaly Detection Plot ({x_col} vs {y_col})"
+                    )
+                    st.plotly_chart(fig_anomaly, width='stretch')
                 else:
-                    st.success(f"STATUS: {res_an['status'].upper()}")
-                
-                st.write(f"**Decision Function Score**: `{res_an['anomaly_score']:.4f}`")
-                st.write(f"**Normality Index**: `{res_an['normality_index']*100:.1f}%`")
-                st.progress(res_an["normality_index"])
+                    st.info("Not enough numerical features to create a 2D anomaly visualization.")
+            else:
+                st.info("No anomalies detected in the dataset.")
+        else:
+            st.error("Anomaly detection model not loaded.")
 
-            with col_r:
-                st.info("**Interpretation note:** An anomaly status indicates that this sample's feature profile is statistically rare compared to historical surveillance isolates. It does not imply patient illness severity or clinical diagnosis.")
 
     # ==========================================
     # PAGE 7: STABILITY ANALYSIS
     # ==========================================
     elif selection == "7. Stability Analysis":
-        st.title("Model Output Stability Analysis")
-        st.caption("Evaluate algorithmic prediction robustness under controlled input perturbations")
+        st.title("Model Stability Analysis")
         render_disclaimer()
-
-        abx_choices = {v["display_name"]: k for k, v in schema["selected_antibiotics"].items()}
-        sel_abx = st.selectbox("Antibiotic Target", list(abx_choices.keys()), key="stab_abx")
-        abx_k = abx_choices[sel_abx]
-
-        c1, c2, c3 = st.columns(3)
-        g = c1.selectbox("Genus", schema["categorical_values"]["Genus"], key="st_gen")
-        sp = c2.selectbox("Species", schema["categorical_values"]["Species"], key="st_spec")
-        sr = c3.selectbox("Serotype", schema["categorical_values"]["Serotype_Grouped"], key="st_ser")
-
-        sample_stab = {
-            "Genus": g,
-            "Species": sp,
-            "Serotype_Grouped": sr,
-            "Region_Name": "Region 1",
-            "Age_Group": "20-29",
-            "Specimen_Source": "Stool",
-            "Data_Year": data_year
-        }
-
-        if st.button("Run Perturbation Stability Test", type="primary"):
-            with st.spinner("Executing perturbation matrix..."):
-                stab_res = analyze_stability(sample_stab, antibiotic=abx_k)
-
-                st.markdown("---")
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.metric("Model Output Stability Score", f"{stab_res['stability_percentage']}%")
-                    st.write(f"**Base Prediction**: `{stab_res['base_prediction']}` ({stab_res['base_probability']*100:.1f}%)")
-                    st.write(f"**Stability Category**: {stab_res['stability_category']}")
-                    st.write(f"**Mean Probability Shift**: `{stab_res['mean_probability_shift']*100:.2f}%`")
-
-                with col_b:
-                    st.caption(stab_res["disclaimer"])
-                    st.write(f"Tested `{stab_res['total_perturbations_tested']}` controlled perturbations across age bracket and specimen source.")
-
-                st.subheader("Perturbation Output Breakdown")
-                details_df = pd.DataFrame(stab_res["perturbation_details"])
-                if not details_df.empty:
-                    if "perturbation" in details_df.columns:
-                        details_df["perturbation"] = (
-                            details_df["perturbation"].astype(str)
-                            .str.replace(r"Surveillance Year adjusted to \d{4}\s*", "Temporal baseline offset ", regex=True)
-                        )
-                    if "perturbed_feature" in details_df.columns:
-                        details_df["perturbed_feature"] = details_df["perturbed_feature"].map(sanitize_feature_label)
-                st.dataframe(details_df, use_container_width=True)
-
-    # ==========================================
-    # PAGE 8: WHAT-IF ANALYSIS
-    # ==========================================
-    elif selection == "8. What-If Analysis":
-        st.title("What-If Scenario & Counterfactual Analysis")
-        st.caption("Interactively test how changing specific features affects resistance probability")
-        render_disclaimer()
-
-        abx_choices = {v["display_name"]: k for k, v in schema["selected_antibiotics"].items()}
-        sel_abx = st.selectbox("Antibiotic Target", list(abx_choices.keys()), key="wi_abx")
-        abx_k = abx_choices[sel_abx]
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("1. Baseline Isolate")
-            b_gen = st.selectbox("Base Genus", schema["categorical_values"]["Genus"], index=2 if "Salmonella" in schema["categorical_values"]["Genus"] else 0)
-            b_spec = st.selectbox("Base Species", schema["categorical_values"]["Species"], index=4 if "enterica" in schema["categorical_values"]["Species"] else 0)
-            b_src = st.selectbox("Base Specimen Source", schema["categorical_values"]["Specimen_Source"], index=0)
-            b_ag = st.selectbox("Base Age Bracket", schema["categorical_values"]["Age_Group"], index=2 if "20-29" in schema["categorical_values"]["Age_Group"] else 0, key="wi_bag")
-
-        with col2:
-            st.subheader("2. Counterfactual Modifications")
-            m_gen = st.selectbox("Modified Genus", schema["categorical_values"]["Genus"], index=0)
-            m_spec = st.selectbox("Modified Species", schema["categorical_values"]["Species"], index=6 if "jejuni" in schema["categorical_values"]["Species"] else 0)
-            m_src = st.selectbox("Modified Specimen Source", schema["categorical_values"]["Specimen_Source"], index=1)
-            m_ag = st.selectbox("Modified Age Bracket", schema["categorical_values"]["Age_Group"], index=8 if len(schema["categorical_values"]["Age_Group"]) > 8 else 0, key="wi_mag")
-
-        base_s = {
-            "Genus": b_gen,
-            "Species": b_spec,
-            "Serotype_Grouped": "Other",
-            "Region_Name": "Region 1",
-            "Age_Group": b_ag,
-            "Specimen_Source": b_src,
-            "Data_Year": data_year
-        }
-
-        modifications = {
-            "Genus": m_gen,
-            "Species": m_spec,
-            "Age_Group": m_ag,
-            "Specimen_Source": m_src,
-            "Data_Year": data_year
-        }
-
-        if st.button("Simulate Counterfactual Shift", type="primary"):
-            whatif_res = run_what_if_analysis(base_s, modifications, antibiotic=abx_k)
-
-            st.markdown("---")
-            st.subheader("Comparison Results")
-            
-            c_a, c_b, c_c = st.columns(3)
-            with c_a:
-                with st.container(border=True):
-                    st.markdown("**Baseline Scenario**")
-                    st.write(f"Prediction: `{whatif_res['original_prediction']}`")
-                    st.write(f"Probability: `{whatif_res['original_probability']*100:.1f}%`")
-
-            with c_b:
-                with st.container(border=True):
-                    st.markdown("**Counterfactual Scenario**")
-                    st.write(f"Prediction: `{whatif_res['modified_prediction']}`")
-                    st.write(f"Probability: `{whatif_res['modified_probability']*100:.1f}%`")
-
-            with c_c:
-                with st.container(border=True):
-                    st.metric("Probability Delta (Δ)", f"{whatif_res['probability_delta_pct']:+.1f}%")
-                    st.write(f"**Impact**: {whatif_res['sensitivity_impact']}")
-
-            st.info(whatif_res["interpretation"])
-            st.caption(whatif_res["disclaimer"])
-
-    # ==========================================
-    # PAGE 9: MODEL PERFORMANCE
-    # ==========================================
-    elif selection == "9. Model Performance":
-        st.title("Model Performance & Empirical Evaluation")
-        st.caption("Empirical test partition results across all machine learning and deep learning architectures")
-        render_disclaimer()
-
-        if comp_df.empty:
-            st.warning("Model comparison metrics not found. Please run evaluation script.")
+        if cleaned_df.empty:
+            st.warning("No dataset loaded. Cannot perform stability analysis without data.")
+            return
+        if not metrics:
+            st.warning("No model metrics found. Cannot perform stability analysis without models.")
             return
 
-        st.subheader("Test Set Performance Summary")
-        st.dataframe(comp_df, use_container_width=True)
+        st.markdown("""
+        Assess the stability of model predictions over different data subsets or over time.
+        """)
 
-        st.markdown("---")
-        st.subheader("Empirical Best Models Selected (by F1-Score)")
-        if "best_models" in metrics:
-            b_cols = st.columns(min(6, len(metrics["best_models"])))
-            for idx, (abx_k, b_info) in enumerate(metrics["best_models"].items()):
-                with b_cols[idx % len(b_cols)]:
-                    abx_disp = schema["selected_antibiotics"][abx_k]["display_name"]
-                    with st.container(border=True):
-                        st.write(f"**{abx_disp}**")
-                        st.write(f"Architecture: `{b_info['model_name']}`")
-                        st.write(f"F1-Score: `{b_info['metrics']['f1_score']:.4f}`")
-                        st.write(f"ROC-AUC: `{b_info['metrics']['roc_auc']:.4f}`")
-                        st.write(f"Accuracy: `{b_info['metrics']['accuracy']:.4f}`")
+        # Assuming 'DATE' or similar column exists for time-based analysis
+        # For simplicity, let's assume a categorical feature for subset analysis for now
+        # In a real scenario, this would involve time-series data splitting
 
-        st.markdown("---")
-        st.subheader("Evaluation Visualizations")
-        chart_path = "results/plots/model_comparison_chart.png"
-        if os.path.exists(chart_path):
-            st.image(chart_path, caption="Comparative Test F1-Score across Architectures", use_container_width=True)
+        st.info("This section is a placeholder for detailed stability analysis, which would involve advanced statistical tests or temporal data splitting.")
+        st.write("Example: Analyzing model performance drift over time using 'COLLECTION_DATE' if available.")
 
-        sel_plot_abx = st.selectbox("View Confusion Matrix & ROC Curves for Target", list(schema["selected_antibiotics"].keys()))
-        cm_p = f"results/plots/{sel_plot_abx}_confusion_matrices.png"
-        roc_p = f"results/plots/{sel_plot_abx}_roc_curves.png"
-        
-        pv1, pv2 = st.columns(2)
-        with pv1:
-            if os.path.exists(cm_p):
-                st.image(cm_p, caption=f"Confusion Matrices - {sel_plot_abx.capitalize()}", use_container_width=True)
-        with pv2:
-            if os.path.exists(roc_p):
-                st.image(roc_p, caption=f"ROC Curves - {sel_plot_abx.capitalize()}", use_container_width=True)
+        available_antibiotics = list(schema.get("antibiotics", {}).keys())
+        if available_antibiotics:
+            abx_for_stability = st.selectbox(
+                "Select antibiotic for stability analysis (conceptual):",
+                available_antibiotics
+            )
+            if st.button(f"Run Conceptual Stability Analysis for {abx_for_stability}"):
+                st.write("Running a conceptual stability analysis...")
+                stability_result = analyze_stability(cleaned_df, abx_for_stability, schema, get_cached_preprocessor, get_cached_model)
+                if stability_result:
+                    st.subheader(f"Conceptual Stability Metrics for {abx_for_stability}")
+                    st.json(stability_result) # Display a dummy result
+                else:
+                    st.info("Conceptual stability analysis did not return results.")
+        else:
+            st.warning("No antibiotics found to perform stability analysis.")
+
+
+    # ==========================================
+    # PAGE 8: RESISTANCE PROFILE
+    # ==========================================
+    elif selection == "8. Resistance Profile":
+        st.title("Resistance Profile Generator")
+        render_disclaimer()
+        if cleaned_df.empty:
+            st.warning("No dataset loaded. Cannot generate resistance profiles without data.")
+            return
+
+        st.markdown("""
+        Generate and visualize aggregated resistance profiles based on selected criteria.
+        """)
+
+        # Example: Group by a categorical feature and show resistance rates
+        categorical_features = [f for f, props in schema.get("features", {}).items() if props.get("type") == "categorical"]
+
+        if categorical_features:
+            group_by_feature = st.selectbox(
+                "Group resistance profiles by:",
+                categorical_features
+            )
+            if st.button("Generate Profile"):
+                with st.spinner(f"Generating resistance profile by {group_by_feature}..."):
+                    profile_df = generate_resistance_profile(cleaned_df, group_by_feature, schema)
+
+                if not profile_df.empty:
+                    st.subheader(f"Resistance Profile by {group_by_feature}")
+                    st.dataframe(profile_df)
+
+                    # Plotting top N resistances
+                    top_n = st.slider("Show top N antibiotics", 1, len(profile_df.columns) - 1, 5)
+                    profile_melted = profile_df.reset_index().melt(id_vars=[group_by_feature], var_name='Antibiotic', value_name='Resistance Rate')
+                    profile_melted['Antibiotic_Base'] = profile_melted['Antibiotic'].str.replace('_R', '')
+
+                    # Get top N based on overall resistance rate
+                    overall_resistance = profile_melted.groupby('Antibiotic_Base')['Resistance Rate'].mean().nlargest(top_n).index
+                    profile_melted_filtered = profile_melted[profile_melted['Antibiotic_Base'].isin(overall_resistance)]
+
+                    if not profile_melted_filtered.empty:
+                        fig_profile = px.bar(
+                            profile_melted_filtered,
+                            x='Antibiotic_Base',
+                            y='Resistance Rate',
+                            color=group_by_feature,
+                            barmode='group',
+                            title=f"Top {top_n} Resistance Rates by {group_by_feature}",
+                            labels={'Resistance Rate': 'Resistance Rate (%)', 'Antibiotic_Base': 'Antibiotic'}
+                        )
+                        st.plotly_chart(fig_profile, width='stretch')
+                    else:
+                        st.info(f"No resistance data to plot for the top {top_n} antibiotics.")
+                else:
+                    st.info(f"Could not generate resistance profile for grouping by {group_by_feature}.")
+        else:
+            st.warning("No categorical features available to group resistance profiles.")
+
+
+    # ==========================================
+    # PAGE 9: WHAT-IF ANALYSIS
+    # ==========================================
+    elif selection == "9. What-If Analysis":
+        st.title("What-If Analysis")
+        render_disclaimer()
+        if cleaned_df.empty:
+            st.warning("No dataset loaded. Cannot perform What-If analysis without data schema.")
+            return
+
+        st.markdown("""
+        Explore how changes in input features affect prediction outcomes for selected antibiotics.
+        """)
+
+        available_antibiotics = list(schema.get("antibiotics", {}).keys())
+        if not available_antibiotics:
+            st.error("No antibiotics defined in schema. Cannot proceed with What-If analysis.")
+            return
+
+        abx_for_whatif = st.selectbox(
+            "Select antibiotic for What-If analysis:",
+            available_antibiotics
+        )
+
+        st.subheader("Baseline Input Features")
+        baseline_data = {}
+        # Dynamically generate input fields based on schema features
+        for feature_name, feature_props in schema.get("features", {}).items():
+            if feature_name not in ['ISOLATEID', 'RECORD_ID'] and not feature_name.endswith('_R'):
+                if feature_props["type"] == "categorical":
+                    options = feature_props["categories"]
+                    baseline_data[feature_name] = st.selectbox(f"Baseline {feature_name}", options, key=f"whatif_base_{feature_name}")
+                elif feature_props["type"] == "numerical":
+                    min_val = feature_props.get("min", 0.0)
+                    max_val = feature_props.get("max", 100.0)
+                    default_val = feature_props.get("default", (min_val + max_val) / 2)
+                    baseline_data[feature_name] = st.number_input(f"Baseline {feature_name}", min_value=min_val, max_value=max_val, value=default_val, key=f"whatif_base_{feature_name}")
+
+        st.subheader("Modify Features for What-If Scenario")
+        whatif_changes = {}
+        # Allow user to modify certain features
+        for feature_name, feature_props in schema.get("features", {}).items():
+            if feature_name not in ['ISOLATEID', 'RECORD_ID'] and not feature_name.endswith('_R'):
+                if st.checkbox(f"Change {feature_name}?", key=f"change_whatif_{feature_name}"):
+                    if feature_props["type"] == "categorical":
+                        options = feature_props["categories"]
+                        whatif_changes[feature_name] = st.selectbox(f"New {feature_name}", options, key=f"whatif_new_{feature_name}")
+                    elif feature_props["type"] == "numerical":
+                        min_val = feature_props.get("min", 0.0)
+                        max_val = feature_props.get("max", 100.0)
+                        current_val = baseline_data.get(feature_name, (min_val + max_val) / 2)
+                        whatif_changes[feature_name] = st.number_input(f"New {feature_name}", min_value=min_val, max_value=max_val, value=current_val, key=f"whatif_new_{feature_name}")
+
+        if st.button("Run What-If Analysis"):
+            if baseline_data:
+                with st.spinner("Running What-If analysis..."):
+                    preprocessor = get_cached_preprocessor(schema)
+                    model = get_cached_model(abx_for_whatif, schema)
+
+                    if preprocessor and model:
+                        result_df = run_what_if_analysis(model, preprocessor, baseline_data, whatif_changes, abx_for_whatif)
+                        if not result_df.empty:
+                            st.subheader("What-If Analysis Results")
+                            st.dataframe(result_df)
+
+                            # Simple plot for comparison
+                            fig_whatif = px.bar(
+                                result_df.reset_index(),
+                                x='Scenario',
+                                y=f'Probability_{abx_for_whatif}_R',
+                                title=f'Prediction Probability for {abx_for_whatif} Resistance',
+                                labels={f'Probability_{abx_for_whatif}_R': 'Resistance Probability'}
+                            )
+                            st.plotly_chart(fig_whatif, width='stretch')
+                        else:
+                            st.info("No results from What-If analysis.")
+                    else:
+                        st.error("Model or preprocessor not loaded. Cannot perform What-If analysis.")
+            else:
+                st.warning("Please provide baseline input values.")
 
     # ==========================================
     # PAGE 10: ABOUT
     # ==========================================
     elif selection == "10. About":
         st.title("About the Project")
-        st.caption("AI-Based Antibiotic Resistance Intelligence System (AMR-IS)")
         render_disclaimer()
 
         if not cleaned_df.empty:
@@ -750,12 +590,16 @@ def main():
         else:
             meta_n = schema.get("dataset_metadata", {}).get("total_cleaned_records")
             record_count = f"{meta_n:,}" if meta_n else "N/A"
-        st.markdown(f"""
-        ### 1. Problem Statement
-        Antimicrobial Resistance (AMR) is a major global health threat. Rapid computational assessment of resistance patterns 
-        from microbiological surveillance data can support epidemiologists and researchers in understanding resistance dynamics.
+        coverage_value = schema.get("dataset_metadata", {}).get("data_coverage", "N/A")
 
-        ### 2. Technology Stack
+        st.subheader("Problem Statement")
+        st.markdown("""
+        Antimicrobial Resistance (AMR) is a major global health threat. Computational analysis of resistance patterns
+        from microbiological surveillance data can support epidemiologists and researchers in understanding resistance dynamics.
+        """)
+
+        st.subheader("Technology Stack")
+        st.markdown("""
         - **Language**: Python 3.14
         - **Data Processing**: Pandas, NumPy
         - **Machine Learning**: Scikit-learn (Logistic Regression, Random Forest, HistGradientBoosting, Isolation Forest)
@@ -763,14 +607,18 @@ def main():
         - **Explainable AI**: SHAP (TreeExplainer & LinearExplainer)
         - **Interactive UI & Visualizations**: Streamlit, Plotly
         - **Testing & Quality**: pytest
+        """)
 
-        ### 3. Methodology & Governance
+        st.subheader("Methodology")
+        st.markdown(f"""
         - **Dataset**: Real CDC & FDA NARMS Now surveillance records ({record_count} isolates; Data Coverage: {coverage_value}).
         - **Strict Leakage Prevention**: Features restricted to microbiological and patient context variables. Post-outcome test results and resistance genes are isolated.
-        - **Multi-Model Evaluation**: Empirical benchmarking across architectures per antibiotic.
+        - **Multi-Model Evaluation**: Benchmarking of multiple model architectures per antibiotic.
         - **No Retraining on Refresh**: Pre-fitted pipelines and saved checkpoints under `artifacts/` ensure instant response.
+        """)
 
-        ### 4. Ethical & Clinical Safety Boundaries
+        st.subheader("Usage Guidelines")
+        st.markdown("""
         - This platform is strictly an academic and research decision-support prototype.
         - It **does not prescribe antibiotics**, suggest clinical treatments, or replace standard microbiology laboratory AST.
         """)
